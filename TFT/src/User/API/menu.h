@@ -66,7 +66,7 @@ typedef union
   void *address;
 } LABEL;
 
-//always initialize label to default values
+// always initialize label to default values
 #define init_label(X) LABEL X = {.index = LABEL_BACKGROUND, .address = NULL}
 
 typedef struct
@@ -133,13 +133,13 @@ typedef struct
   uint16_t      font;
 } LIVE_DATA;
 
- typedef struct
+typedef struct
 {
   uint8_t   enabled[LIVEICON_LINES];
   LIVE_DATA lines[LIVEICON_LINES];
 } LIVE_INFO;
 
-void showLiveInfo(uint8_t index, const LIVE_INFO * liveicon, const ITEM * item);
+typedef bool (* CONDITION_CALLBACK)(void);
 
 extern const GUI_RECT exhibitRect;
 extern const GUI_RECT rect_of_key[MENU_RECT_COUNT];
@@ -171,13 +171,19 @@ void menuDrawTitle(const uint8_t *content);  //(const MENUITEMS * menuItems);
 void menuReDrawCurTitle(void);
 void menuDrawPage (const MENUITEMS * menuItems);
 void menuDrawListPage(const LISTITEMS *listItems);
+
+void showLiveInfo(uint8_t index, const LIVE_INFO * liveicon, const ITEM * item);
+void displayExhibitHeader(const char * titleStr, const char * unitStr);
+void displayExhibitValue(const char * valueStr);
+
 void itemDrawIconPress(uint8_t position, uint8_t is_press);
 KEY_VALUES menuKeyGetValue(void);
 GUI_POINT getIconStartPoint(int index);
 
 void loopBackEnd(void);
 void loopFrontEnd(void);
-void loopProcess (void);
+void loopProcess(void);
+void loopProcessToCondition(CONDITION_CALLBACK condCallback);
 
 #ifdef __cplusplus
 }

@@ -163,12 +163,6 @@ void infoSettingsReset(void)
     infoSettings.pause_feedrate[i]    = default_pause_speed[i];  // XY, Z, E
   }
 
-  for (int i = 0; i < PREHEAT_COUNT; i++)
-  {
-    infoSettings.preheat_temp[i]      = default_preheat_ext[i];
-    infoSettings.preheat_bed[i]       = default_preheat_bed[i];
-  }
-
   resetConfig();
 }
 
@@ -191,6 +185,7 @@ void initMachineSetting(void)
   infoMachineSettings.autoReportSDStatus      = DISABLED;
   infoMachineSettings.long_filename_support   = DISABLED;
   infoMachineSettings.babyStepping            = DISABLED;
+  infoMachineSettings.buildPercent            = DISABLED;
   infoMachineSettings.softwareEndstops        = ENABLED;
 }
 
@@ -241,6 +236,8 @@ void setupMachine(void)
   {
     mustStoreCmd("M555 P2\n");  //  Set RRF compatibility behaves similar to 2: Marlin
   }
+  mustStoreCmd("M82\n");  // Set extruder to absolute mode
+  mustStoreCmd("G90\n");  // Set to Absolute Positioning
 }
 
 float flashUsedPercentage(void)
