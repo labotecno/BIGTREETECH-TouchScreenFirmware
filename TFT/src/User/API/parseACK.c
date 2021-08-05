@@ -206,7 +206,9 @@ bool processKnownEcho(void)
     //if (forceIgnore[i] == 0)
     //{
       if (knownEcho[i].notifyType == ECHO_NOTIFY_TOAST)
+      {
         addToast(DIALOG_TYPE_INFO, dmaL2Cache);
+      }
       else if (knownEcho[i].notifyType == ECHO_NOTIFY_DIALOG)
       {
         BUZZER_PLAY(sound_notify);
@@ -624,6 +626,7 @@ void parseACK(void)
           ack_seen("result\":\"0:/gcodes/");  // {"key":"job.file.fileName","flags": "","result":"0:/gcodes/pig-4H.gcode"}
           fileEndString = "\"";
         }
+
         uint16_t start_index = ack_index;
         uint16_t end_index = ack_continue_seen(fileEndString) ? (ack_index - strlen(fileEndString)) : start_index;
         uint16_t path_len = MIN(end_index - start_index, MAX_PATH_LEN - strlen(getCurFileSource()) - 1);
@@ -755,15 +758,17 @@ void parseACK(void)
         pidUpdateStatus(false);
       }
       // parse and store M355, Case light message
-      else if (ack_seen("Case light: OFF"))
+      else if (ack_seen("Case light:"))
       {
-        caseLightSetState(false);
-        caseLightQuerySetWait(false);
-      }
-      else if (ack_seen("Case light: "))
-      {
-        caseLightSetState(true);
-        caseLightSetBrightness(ack_value());
+        if (ack_seen("OFF"))
+        {
+          caseLightSetState(false);
+        }
+        else
+        {
+          caseLightSetState(true);
+          caseLightSetBrightness(ack_value());
+        }
         caseLightQuerySetWait(false);
       }
       // parse and store M420 V1 T1, Mesh data (e.g. from Mesh Editor menu)
@@ -1028,11 +1033,12 @@ void parseACK(void)
         if (ack_seen("E")) setParameter(P_HYBRID_THRESHOLD, STEPPER_INDEX_E0 + i, ack_value());
       }
       // parse and store TMC Bump sensitivity values
-      else if (ack_seen("M914 X"))
+      else if (ack_seen("M914"))
       {
-                           setParameter(P_BUMPSENSITIVITY, AXIS_INDEX_X, ack_value());
-        if (ack_seen("Y")) setParameter(P_BUMPSENSITIVITY, AXIS_INDEX_Y, ack_value());
-        if (ack_seen("Z")) setParameter(P_BUMPSENSITIVITY, AXIS_INDEX_Z, ack_value());
+        uint8_t i = (ack_seen("I")) ? ack_value() : 0;
+        if (ack_seen("X")) setParameter(P_BUMPSENSITIVITY, STEPPER_INDEX_X + i, ack_value());
+        if (ack_seen("Y")) setParameter(P_BUMPSENSITIVITY, STEPPER_INDEX_Y + i, ack_value());
+        if (ack_seen("Z")) setParameter(P_BUMPSENSITIVITY, STEPPER_INDEX_Z + i, ack_value());
       }
       // parse and store ABL type if auto-detect is enabled
       #if ENABLE_BL_VALUE == 1
@@ -1220,7 +1226,7 @@ void parseACK(void)
       {
         if (ack_seen(errorZProbe))  // smoothieboard ZProbe triggered before move, aborting command.
         {
-          ackPopupInfo("ZProbe triggered\n before move.\n Aborting Print!");
+          ackPopupInfo("ZProbe triggered before move.\nAborting Print!");
         }
         // parse and store volumetric extrusion M200 response of Smoothieware
         else if (ack_seen("Volumetric extrusion is disabled"))
