@@ -285,7 +285,7 @@ static inline void scanResetDir(void)
     }
 
     infoSettingsReset();
-    LCD_RefreshDirection();
+    LCD_RefreshDirection(infoSettings.rotated_ui);
     TSC_Calibration();
     storePara();
     f_rename(TFT_RESET_FILE, renamedReset);

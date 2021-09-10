@@ -1,8 +1,6 @@
 #include "ZOffset.h"
 #include "includes.h"
 
-#define ITEM_Z_OFFSET_SUBMENU_NUM 4
-
 static bool probeOffsetMenu = false;
 static uint8_t curUnit_index = 0;
 static uint8_t curSubmenu_index = 0;
@@ -38,7 +36,7 @@ void zOffsetDraw(bool status, float val)
   {
     sprintf(tempstr, "ZO:%.2f  ", val);
     sprintf(tempstr3, "Shim:%.3f", infoSettings.level_z_pos);
-    GUI_SetColor(infoSettings.sd_reminder_color);
+    GUI_SetColor(infoSettings.status_color);
     sprintf(tempstr2, "  %.2f  ", val + infoSettings.level_z_pos);
   }
 
@@ -58,7 +56,7 @@ void zOffsetSetMenu(bool probeOffset)
 
 void menuZOffset(void)
 {
-  ITEM itemZOffsetSubmenu[ITEM_Z_OFFSET_SUBMENU_NUM] = {
+  ITEM itemZOffsetSubmenu[] = {
     // icon                        label
     {ICON_01_MM,                   LABEL_01_MM},
     {ICON_RESET_VALUE,             LABEL_RESET},
@@ -94,19 +92,12 @@ void menuZOffset(void)
   KEY_VALUES key_num = KEY_IDLE;
   float now, z_offset;
   float unit;
-  float ablState;
-  void (* offsetEnable)(bool, float);          // enable Z offset
+  void (* offsetEnable)(float);                // enable Z offset
   void (* offsetDisable)(void);                // disable Z offset
   bool (* offsetGetStatus)(void);              // get current status
   float (* offsetGetValue)(void);              // get current Z offset
   float (* offsetResetValue)(void);            // reset current Z offset
   float (* offsetUpdateValue)(float, int8_t);  // update current Z offset
-
-  ablState = getParameter(P_ABL_STATE, 0);
-
-  // if enabled, always disable ABL before editing a mesh
-  if (ablState == ENABLED)
-    storeCmd(infoMachineSettings.firmwareType != FW_REPRAPFW ? "M420 S0\n" : "G29 S2\n");
 
   if (probeOffsetMenu)
   { // use Probe Offset menu
@@ -179,7 +170,7 @@ void menuZOffset(void)
       // enable/disable Z offset change
       case KEY_ICON_4:
         if (!offsetGetStatus())
-          offsetEnable(true, infoSettings.level_z_pos);
+          offsetEnable(infoSettings.level_z_pos);
         else
           offsetDisable();
 
@@ -191,7 +182,7 @@ void menuZOffset(void)
 
       // change submenu
       case KEY_ICON_5:
-        curSubmenu_index = (curSubmenu_index + 1) % ITEM_Z_OFFSET_SUBMENU_NUM;
+        curSubmenu_index = (curSubmenu_index + 1) % COUNT(itemZOffsetSubmenu);
         zOffsetItems.items[KEY_ICON_6] = itemZOffsetSubmenu[curSubmenu_index];
 
         menuDrawItem(&zOffsetItems.items[KEY_ICON_6], KEY_ICON_6);
@@ -203,7 +194,7 @@ void menuZOffset(void)
         {
           // change unit
           case 0:
-            curUnit_index = (curUnit_index + 1) % ITEM_FINE_MOVE_LEN_NUM;
+            curUnit_index = (curUnit_index + 1) % COUNT(itemZOffsetSubmenu);
             itemZOffsetSubmenu[curSubmenu_index] = itemMoveLen[curUnit_index];
             zOffsetItems.items[key_num] = itemZOffsetSubmenu[curSubmenu_index];
 
@@ -274,8 +265,4 @@ void menuZOffset(void)
 
     loopProcess();
   }
-
-  // restore original ABL state
-  if (ablState == ENABLED)
-    storeCmd(infoMachineSettings.firmwareType != FW_REPRAPFW ? "M420 S1\n" : "G29 S1\n");
 }
