@@ -305,7 +305,7 @@ static LABEL * curTitle = NULL;
 static const GUI_RECT *curRect = NULL;  // current menu layout grid
 static uint16_t curRectCount = 0;       // current menu layout rect count
 
-static REMINDER reminder = {{0, 0, LCD_WIDTH, TITLE_END_Y}, 0, STATUS_UNCONNECT, LABEL_UNCONNECTED};
+static REMINDER reminder = {{0, 0, LCD_WIDTH, TITLE_END_Y}, 0, STATUS_UNCONNECTED, LABEL_UNCONNECTED};
 static REMINDER volumeReminder = {{0, 0, LCD_WIDTH, TITLE_END_Y}, 0, STATUS_IDLE, LABEL_BACKGROUND};
 static REMINDER busySign = {{LCD_WIDTH - 5, 0, LCD_WIDTH, 5}, 0, STATUS_BUSY, LABEL_BUSY};
 
@@ -392,7 +392,9 @@ MENU_TYPE getMenuType(void)
   return menuType;
 }
 
-void setMenu(MENU_TYPE menu_type, LABEL * title, uint16_t rectCount, const GUI_RECT * menuRect, void(*action_redraw)(uint8_t position, uint8_t is_press), void (* menu_redraw)(void))
+void setMenu(MENU_TYPE menu_type, LABEL * title, uint16_t rectCount, const GUI_RECT * menuRect,
+             void(*action_redraw)(uint8_t position, uint8_t is_press),
+             void (*menu_redraw)(void))
 {
   menuType = menu_type;
   curRect = menuRect;
@@ -400,12 +402,10 @@ void setMenu(MENU_TYPE menu_type, LABEL * title, uint16_t rectCount, const GUI_R
   curTitle = title;
   TSC_ReDrawIcon = action_redraw;
   curMenuRedrawHandle = menu_redraw;
-}
 
-void reminderSetUnConnected(void)
-{
-  reminder.status = STATUS_UNCONNECT;
-  reminder.inf = LABEL_UNCONNECTED;
+  #if LCD_ENCODER_SUPPORT
+    encoderPosition = 0;
+  #endif
 }
 
 void reminderMessage(int16_t inf, SYS_STATUS status)
@@ -468,8 +468,13 @@ void loopReminderClear(void)
         return;
       break;
 
-    case STATUS_UNCONNECT:
+    case STATUS_UNCONNECTED:
       if (infoHost.connected == false)
+        return;
+      break;
+
+    case STATUS_LISTENING:
+      if (GET_BIT(infoSettings.general_settings, LISTENING_MODE) == 1)
         return;
       break;
 
@@ -608,11 +613,16 @@ void menuDrawPage(const MENUITEMS *menuItems)
 
   menuClearGaps();  // Use this function instead of GUI_Clear to eliminate the splash screen when clearing the screen.
   menuDrawTitle(labelGetAddress(&menuItems->title));
+
   for (i = 0; i < ITEM_PER_PAGE; i++)
   {
     menuDrawItem(&menuItems->items[i], i);
     RAPID_PRINTING_COMM()  // perform backend printing loop between drawing icons to avoid printer idling
   }
+
+  #if LCD_ENCODER_SUPPORT
+    encoderPosition = 0;
+  #endif
 }
 
 // Draw the entire interface
@@ -639,6 +649,10 @@ void menuDrawListPage(const LISTITEMS *listItems)
       menuDrawListItem(&curListItems->items[i], i);
     RAPID_PRINTING_COMM()  // perform backend printing loop between drawing icons to avoid printer idling
   }
+
+  #if LCD_ENCODER_SUPPORT
+    encoderPosition = 0;
+  #endif
 }
 
 // Show live info text on icons
@@ -848,6 +862,11 @@ KEY_VALUES menuKeyGetValue(void)
     titleBarPress();
     tempkey = KEY_IDLE;
   }
+
+  #if LCD_ENCODER_SUPPORT
+    if (tempkey == KEY_IDLE)
+      tempkey = LCD_Enc_KeyValue();
+  #endif
 
   return tempkey;
 }
