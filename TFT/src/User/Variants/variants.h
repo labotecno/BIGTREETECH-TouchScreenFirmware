@@ -54,16 +54,8 @@
   #include "pin_MKS_TFT28_V3_0.h"
 #elif defined(MKS_TFT28_V4_0)
   #include "pin_MKS_TFT28_V4_0.h"
-#endif
-
-#ifdef SERIAL_PORT_4
-  #define MAX_MULTI_SERIAL (1 << 3)
-#elif defined(SERIAL_PORT_3)
-  #define MAX_MULTI_SERIAL (1 << 2)
-#elif defined(SERIAL_PORT_2)
-  #define MAX_MULTI_SERIAL (1 << 1)
-#else
-  #define MAX_MULTI_SERIAL (1 << 0)
+#elif defined(MKS_TFT28_NEW_GENIUS)
+  #include "pin_MKS_TFT28_NEW_GENIUS.h"
 #endif
 
 #define LCD_ENCODER_SUPPORT (defined(LCD_ENCA_PIN) && defined(LCD_ENCB_PIN) && defined(LCD_BTN_PIN))

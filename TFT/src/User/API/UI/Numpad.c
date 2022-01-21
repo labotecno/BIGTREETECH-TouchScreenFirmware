@@ -1,4 +1,5 @@
 #include "Numpad.h"
+#include "includes.h"
 #include "CharIcon.h"
 
 #define SKEYHEIGHT (LCD_HEIGHT - ICON_START_Y) / 4
@@ -109,7 +110,7 @@ void drawKeypadButton(uint8_t index, uint8_t isPressed)
                   .rect       = rectBtn};
 
     setFontSize(FONT_SIZE_LARGE);
-    if (!(index == NUM_KEY_DEC && ((numpadType >> 0) & 1)) && !(index == NUM_KEY_MINUS && !((numpadType >> 1) & 1)))
+    if (!(index == NUM_KEY_DEC && GET_BIT(numpadType, 0)) && !(index == NUM_KEY_MINUS && !GET_BIT(numpadType, 1)))
       GUI_DrawButton(&btn, isPressed);
     setFontSize(FONT_SIZE_NORMAL);
     #else
@@ -211,7 +212,7 @@ double numPadFloat(uint8_t * title, double old_val, double reset_val, bool negat
   NUM_KEY_VALUES key_num = NUM_KEY_IDLE;
   touchSound = false;
 
-  uint8_t nowIndex = 0;
+  uint8_t nowIndex;
   uint8_t lastIndex = 0;
   char ParameterBuf[FLOAT_BUF_LENGTH + 1] = {0};
   uint8_t prec = (old_val == 0) ? 0 : 3;
@@ -236,29 +237,39 @@ double numPadFloat(uint8_t * title, double old_val, double reset_val, bool negat
     switch (key_num)
     {
       case NUM_KEY_EXIT:
-        BUZZER_PLAY(sound_cancel);
+        BUZZER_PLAY(SOUND_CANCEL);
         touchSound = true;
         return old_val;
 
       case NUM_KEY_DEL:
-        if (nowIndex)
+        if (nowIndex == 1)  // last character deleted
         {
-          ParameterBuf[--nowIndex] = 0;
-          valueFirstPress = false;
-          BUZZER_PLAY(sound_keypress);
+          if (ParameterBuf[0] == '0')
+          { // '0' cannot be deleted
+            BUZZER_PLAY(SOUND_DENY);
+            break;
+          }
+          else
+          {
+            ParameterBuf[0] = '0';
+            lastIndex = 0;  // this will trigger a value redraw
+          }
         }
         else
         {
-          BUZZER_PLAY(sound_deny);
+          ParameterBuf[--nowIndex] = 0;
         }
+
+        BUZZER_PLAY(SOUND_KEYPRESS);
+        valueFirstPress = false;
         break;
 
       case NUM_KEY_RESET:
         sprintf(ParameterBuf, "%.*f", prec, reset_val);
         nowIndex = strlen(ParameterBuf);
-        lastIndex = nowIndex + 1;
+        lastIndex = 0;
         valueFirstPress = true;
-        BUZZER_PLAY(sound_keypress);
+        BUZZER_PLAY(SOUND_KEYPRESS);
         break;
 
       case NUM_KEY_1:
@@ -274,20 +285,26 @@ double numPadFloat(uint8_t * title, double old_val, double reset_val, bool negat
         if (valueFirstPress == true)
         {
           valueFirstPress = false;
-          ParameterBuf[0] = '0';
-          nowIndex = 1;
+          nowIndex = lastIndex = 0;
         }
         if (nowIndex < FLOAT_BUF_LENGTH - 1)
         {
-          if (ParameterBuf[0] == '0' && nowIndex == 1)
+          if (ParameterBuf[0] == '0' && nowIndex == 1)  // avoid "0x", change to "x"
+          {
             nowIndex = lastIndex = 0;
+          }
+          else if(ParameterBuf[0] == '-' && ParameterBuf[1] == '0' && nowIndex == 2)  // avoid "-0x", change to "-x"
+          {
+            nowIndex = lastIndex = 1;
+          }
+
           ParameterBuf[nowIndex++] = numPadKeyChar[key_num][0];
           ParameterBuf[nowIndex] = 0;
-          BUZZER_PLAY(sound_keypress);
+          BUZZER_PLAY(SOUND_KEYPRESS);
         }
         else
         {
-          BUZZER_PLAY(sound_deny);
+          BUZZER_PLAY(SOUND_DENY);
         }
         break;
 
@@ -295,20 +312,22 @@ double numPadFloat(uint8_t * title, double old_val, double reset_val, bool negat
         if (valueFirstPress == true)
         {
           valueFirstPress = false;
-          ParameterBuf[0] = 0;
-          nowIndex = lastIndex = 0;
+          ParameterBuf[0] = '0';
+          nowIndex = lastIndex = 1;
         }
         if (!strchr((const char *)ParameterBuf, numPadKeyChar[key_num][0]) && nowIndex < (FLOAT_BUF_LENGTH - 1))
         {
-          if (nowIndex == 0 || (nowIndex == 1 && strchr((const char *)ParameterBuf, '-')))  // check if no number exits or only minus exists
-            ParameterBuf[nowIndex++] = '0';                                                 // add zero before decimal sign if it is the first character
-          ParameterBuf[nowIndex++] = numPadKeyChar[key_num][0];
+          if (nowIndex == 1 && ParameterBuf[0] == '-')  // check if minus sign and no other number
+          {
+            ParameterBuf[nowIndex++] = '0';             // add zero between minus and decimal sign
+          }
+          ParameterBuf[nowIndex++] = '.';
           ParameterBuf[nowIndex] = 0;
-          BUZZER_PLAY(sound_keypress);
+          BUZZER_PLAY(SOUND_KEYPRESS);
         }
         else
         {
-          BUZZER_PLAY(sound_deny);
+          BUZZER_PLAY(SOUND_DENY);
         }
         break;
 
@@ -318,34 +337,32 @@ double numPadFloat(uint8_t * title, double old_val, double reset_val, bool negat
           if (valueFirstPress == true)
           {
             valueFirstPress = false;
-            ParameterBuf[0] = 0;
-            nowIndex = lastIndex = 0;
+            ParameterBuf[0] = '0';
+            nowIndex = 1;
           }
-          if (!strchr((const char *)ParameterBuf, numPadKeyChar[key_num][0]) && nowIndex == 0)
+          if (nowIndex == 1 && ParameterBuf[0] == '0')
           {
-            ParameterBuf[nowIndex++] = numPadKeyChar[key_num][0];
-            ParameterBuf[nowIndex] = 0;
-            BUZZER_PLAY(sound_keypress);
+            ParameterBuf[0] = '-';
+            ParameterBuf[1] = 0;
+            lastIndex = 0;  // this will trigger a value redraw
+            BUZZER_PLAY(SOUND_KEYPRESS);
           }
           else
           {
-            BUZZER_PLAY(sound_deny);
+            BUZZER_PLAY(SOUND_DENY);
           }
         }
         break;
 
       case NUM_KEY_OK:
-        if (nowIndex > 0)
+        if (nowIndex == 1 && ParameterBuf[0] == '-')
         {
-          if (nowIndex == 1 && (strchr((const char *)ParameterBuf, '.') || strchr((const char *)ParameterBuf, '-')))
-          {
-            BUZZER_PLAY(sound_deny);
-            break;
-          }
-          BUZZER_PLAY(sound_ok);
-          touchSound = true;
-          return strtod(ParameterBuf, NULL);
+          BUZZER_PLAY(SOUND_DENY);
+          break;
         }
+        BUZZER_PLAY(SOUND_OK);
+        touchSound = true;
+        return strtod(ParameterBuf, NULL);
 
       default:
         break;
@@ -395,7 +412,7 @@ int32_t numPadInt(uint8_t* title, int32_t old_val, int32_t reset_val, bool negat
     switch (key_num)
     {
       case NUM_KEY_EXIT:
-        BUZZER_PLAY(sound_cancel);
+        BUZZER_PLAY(SOUND_CANCEL);
         touchSound = true;
         return old_val;
 
@@ -403,7 +420,7 @@ int32_t numPadInt(uint8_t* title, int32_t old_val, int32_t reset_val, bool negat
         if (negative)
         {
           neg = neg * -1;
-          BUZZER_PLAY(sound_keypress);
+          BUZZER_PLAY(SOUND_KEYPRESS);
         }
         break;
 
@@ -412,11 +429,11 @@ int32_t numPadInt(uint8_t* title, int32_t old_val, int32_t reset_val, bool negat
         {
           val /= 10;
           valueFirstPress = false;
-          BUZZER_PLAY(sound_keypress);
+          BUZZER_PLAY(SOUND_KEYPRESS);
         }
         else
         {
-          BUZZER_PLAY(sound_deny);
+          BUZZER_PLAY(SOUND_DENY);
         }
         break;
 
@@ -424,7 +441,7 @@ int32_t numPadInt(uint8_t* title, int32_t old_val, int32_t reset_val, bool negat
         neg = (reset_val >= 0) ? 1 : -1;
         val = reset_val * neg;
         valueFirstPress = true;
-        BUZZER_PLAY(sound_keypress);
+        BUZZER_PLAY(SOUND_KEYPRESS);
         break;
 
       case NUM_KEY_1:
@@ -447,16 +464,16 @@ int32_t numPadInt(uint8_t* title, int32_t old_val, int32_t reset_val, bool negat
         {
           int num = (numPadKeyChar[key_num][0] - '0');
           val = (val * 10) + ABS(num);
-          BUZZER_PLAY(sound_keypress);
+          BUZZER_PLAY(SOUND_KEYPRESS);
         }
         else
         {
-          BUZZER_PLAY(sound_deny);
+          BUZZER_PLAY(SOUND_DENY);
         }
         break;
 
       case NUM_KEY_OK:
-        BUZZER_PLAY(sound_ok);
+        BUZZER_PLAY(SOUND_OK);
         setFontSize(FONT_SIZE_NORMAL);
         touchSound = true;
         return (val * neg);

@@ -16,20 +16,15 @@ extern "C" {
 
 #define SPACE_Y          ((LCD_HEIGHT - ICON_START_Y - ICON_HEIGHT * 2) / 2)
 
-#ifdef TFT70_V3_0
-#define SSICON_FIRST_ROW 5
-#define SSICON_SECOND    ROW
-#endif
-
 // select marlin or bigtree
 #define SPACE_SELEX      ((LCD_WIDTH - ICON_WIDTH * 2) / 4)
 #define SPACE_SELEY      ((LCD_HEIGHT - ICON_HEIGHT) / 2)
 #define text_startx      (LCD_WIDTH / 2)
 
 // thumbnail parser options
-#define PARSER_CLASSIC      0
-#define PARSER_RGB565       1
-#define PARSER_BASE64PNG    2
+#define PARSER_CLASSIC   0
+#define PARSER_RGB565    1
+#define PARSER_BASE64PNG 2
 
 void LOGO_ReadDisplay(void);
 void ICON_PartialReadDisplay(uint16_t sx, uint16_t sy, int16_t width, int16_t height, uint8_t icon, uint16_t isx, uint16_t isy);

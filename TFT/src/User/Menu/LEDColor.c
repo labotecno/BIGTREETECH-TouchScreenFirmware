@@ -28,6 +28,8 @@ typedef enum
   LED_KEY_CANCEL,
   LED_KEY_OK,
   // no need to declare key numbers if no special task is performed by the key
+  LED_KEY_INCREASE = KEY_INCREASE,
+  LED_KEY_DECREASE = KEY_DECREASE,
   LED_KEY_IDLE = IDLE_TOUCH,
 } LED_KEY_VALUES;
 
@@ -119,19 +121,21 @@ const GUI_RECT ledKeyRect[KEY_NUM] = {
 #endif
 };
 
-#ifdef KEYBOARD_ON_LEFT
 const GUI_RECT ledColorRect = {
-  3 * KB_WIDTH, 0 * KB_HEIGHT, 4 * KB_WIDTH, 1 * KB_HEIGHT};
+  #ifdef KEYBOARD_ON_LEFT
+    3 * KB_WIDTH, 0 * KB_HEIGHT, 4 * KB_WIDTH, 1 * KB_HEIGHT
+  #else
+    0 * KB_WIDTH, 0 * KB_HEIGHT, 1 * KB_WIDTH, 1 * KB_HEIGHT
+  #endif
+};
 
 const GUI_RECT ledPageRect = {
-  2 * CTRL_WIDTH, 4 * CTRL_HEIGHT, 3 * CTRL_WIDTH, 5 * KB_HEIGHT};
-#else
-const GUI_RECT ledColorRect = {
-  0 * KB_WIDTH, 0 * KB_HEIGHT, 1 * KB_WIDTH, 1 * KB_HEIGHT};
-
-const GUI_RECT ledPageRect = {
-  0 * CTRL_WIDTH, 4 * CTRL_HEIGHT, 1 * CTRL_WIDTH, 5 * KB_HEIGHT};
-#endif
+  #ifdef KEYBOARD_ON_LEFT
+    2 * CTRL_WIDTH, 4 * CTRL_HEIGHT, 3 * CTRL_WIDTH, 5 * KB_HEIGHT
+  #else
+    0 * CTRL_WIDTH, 4 * CTRL_HEIGHT, 1 * CTRL_WIDTH, 5 * KB_HEIGHT
+  #endif
+};
 
 // area rectangles
 const GUI_RECT ledAreaRect[2] = {
@@ -159,7 +163,10 @@ uint8_t ledIndex = 0;
 
 void ledSendValue(const LED_VECT * led)
 {
-  storeCmd("M150 R%d U%d B%d W%d P%d I%d\n", (*led)[0], (*led)[1], (*led)[2], (*led)[3], (*led)[4], (*led)[5]);
+  if (infoMachineSettings.firmwareType != FW_REPRAPFW)
+    storeCmd("M150 R%d U%d B%d W%d P%d I%d\n", (*led)[0], (*led)[1], (*led)[2], (*led)[3], (*led)[4], (*led)[5]);
+  else
+    storeCmd("M150 X2 R%d U%d B%d P%d\n", (*led)[0], (*led)[1], (*led)[2], (*led)[4]);
 }
 
 void ledGetValue(LED_VECT * led)
@@ -384,11 +391,7 @@ void menuLEDColorCustom(void)
 
   ledDrawMenu();
 
-  #if LCD_ENCODER_SUPPORT
-    encoderPosition = 0;
-  #endif
-
-  while (infoMenu.menu[infoMenu.cur] == menuLEDColorCustom)
+  while (MENU_IS(menuLEDColorCustom))
   {
     key_num = menuKeyGetValue();
     switch (key_num)
@@ -398,7 +401,6 @@ void menuLEDColorCustom(void)
         if (ledPage > 0)
         {
           ledPage--;
-
           updateForced = true;
         }
         break;
@@ -408,7 +410,6 @@ void menuLEDColorCustom(void)
         if (ledPage < (PAGE_NUM - 1))
         {
           ledPage++;
-
           updateForced = true;
         }
         break;
@@ -420,7 +421,7 @@ void menuLEDColorCustom(void)
 
       // restore original LED color and exit
       case LED_KEY_CANCEL:
-        infoMenu.cur--;
+        CLOSE_MENU();
         // no break here
 
       // restore original LED color
@@ -431,18 +432,19 @@ void menuLEDColorCustom(void)
         break;
 
       // use rotary encoder to update LED component value
-      case LED_KEY_IDLE:
-        #if LCD_ENCODER_SUPPORT
-          if (encoderPosition)
-          {
-            curValue = ledUpdateComponentValue(ledIndex, 1, (encoderPosition > 0) ? 1 : -1);
+      case LED_KEY_INCREASE:
+        curValue = ledUpdateComponentValue(ledIndex, 1, 1);
+        break;
 
-            encoderPosition = 0;
-          }
-        #endif
+      case LED_KEY_DECREASE:
+        curValue = ledUpdateComponentValue(ledIndex, 1, -1);
+        break;
+
+      case LED_KEY_IDLE:
         break;
 
       default:
+      {
         ledIndex = ledGetControlIndex(key_num);  // get control index
 
         switch (ledGetControlSubIndex(key_num))  // get control sub index
@@ -450,7 +452,6 @@ void menuLEDColorCustom(void)
           case 1:
           {
             curValue = ledEditComponentValue(ledIndex);
-
             sendingNeeded = true;
 
             ledDrawMenu();
@@ -471,6 +472,7 @@ void menuLEDColorCustom(void)
             break;
         }
         break;
+      }
     }
 
     if (updateForced)
@@ -530,7 +532,7 @@ void menuLEDColor(void)
 
   menuDrawPage(&LEDColorItems);
 
-  while (infoMenu.menu[infoMenu.cur] == menuLEDColor)
+  while (MENU_IS(menuLEDColor))
   {
     key_num = menuKeyGetValue();
     switch (key_num)
@@ -557,7 +559,7 @@ void menuLEDColor(void)
 
       // custom LED color
       case KEY_ICON_4:
-        infoMenu.menu[++infoMenu.cur] = menuLEDColorCustom;
+        OPEN_MENU(menuLEDColorCustom);
         break;
 
       // turn off
@@ -566,7 +568,7 @@ void menuLEDColor(void)
         break;
 
       case KEY_ICON_7:
-        infoMenu.cur--;
+        CLOSE_MENU();
         break;
 
       default:
