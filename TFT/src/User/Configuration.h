@@ -1,7 +1,7 @@
 #ifndef _CONFIGURATION_H_
 #define _CONFIGURATION_H_
 
-#define CONFIG_VERSION 20211130
+#define CONFIG_VERSION 20211213
 
 //====================================================================================================
 //=============================== Settings Configurable On config.ini ================================
@@ -64,6 +64,18 @@
  *   Options: [disable: 0, enable: 1]
  */
 #define EMULATED_M109_M190 1  // Default: 1
+
+/**
+ * Event LED
+ * When printing from TFT SD / TFT U Disk, the TFT periodically sets the printer's (neopixel) LED color
+ * and TFT's knob LED color, if any, according to the current nozzle and bed temperatures.
+ *
+ * NOTE: If "EMULATED_M109_M190" is disabled (heating controlled by printer), the TFT cannot control the
+ *       printer's (neopixel) LED during heating. It will control only the TFT's knob LED, if any.
+ *
+ *   Options: [disable: 0, enable: 1]
+ */
+#define EVENT_LED 1  // Default: 1
 
 /**
  * G-code File Comment Parsing
@@ -178,6 +190,14 @@
  *   Options: [disable: 0, enable: 1]
  */
 #define FILES_LIST_MODE 1  // Default: 1
+
+/**
+ * Filename Extension
+ * Display fullname for files listed in List Mode / Icon Mode menu.
+ * If disabled, any filename extension starting with ".g" or ".G" (e.g. ".g", ".gco", ".gcode" etc.) will be hidden.
+ *   Options: [disable: 0, enable: 1]
+ */
+#define FILENAME_EXTENSION 1  // Default: 1
 
 /**
  * Fan Speed In Percentage
@@ -1248,7 +1268,7 @@
 #define KEYBOARD_COLOR_LAYOUT 0  // Default: 0
 
 /**
- * QWERTY/QWERTZ Keyboard Layout
+ * QWERTY/QWERTZ Keyboard Layout (Terminal menu)
  * Keyboard layout for Terminal Keyboard (Only for TFT70 V3.0).
  *   Options: [qwerty: 0, qwertz: 1, azerty: 2]
  *     qwerty: The typically keyboard Layout for english.
@@ -1258,8 +1278,8 @@
 #define TERMINAL_KEYBOARD_LAYOUT 0  // Default: 0
 
 /**
- * Progress bar color
- * The color of the progress bar during print
+ * Progress Bar Color (Printing menu)
+ * The color of the progress bar during print.
  *   Options: [Orange: 0, Yellow: 1, Red: 2, Green: 3, Blue: 4, Cyan: 5, Magenta: 6, Purple: 7, Lime: 8, Gray: 9]
  */
 #define PROGRESS_BAR_COLOR 0  // Default: 0
@@ -1270,6 +1290,15 @@
  * Comment to enable a standard progress bar.
  */
 //#define MARKED_PROGRESS_BAR  // Default: commented (disabled)
+
+/**
+ * Live Text Common Color Layout (Status Screen menu)
+ * Some topics require to use a common color for live text in Status Screen menu.
+ * Uncomment to use the color of live text 1 (name) also for live text 2 (value)
+ * (e.g. for THEME_Rep Rap Firmware Dark theme).
+ * Comment to use standard colors.
+ */
+//#define LIVE_TEXT_COMMON_COLOR  // Default: commented (disabled)
 
 /**
  * Live Text Background Color Rendering Technique (Printing menu and Status Screen menu)
@@ -1329,7 +1358,7 @@
  *                    flexible but requires a dedicated post-processing of gcode files for
  *                    most slicers. "Classic" is used as fallback.
  *     Base64 PNG:    A specific thumbnail comment identifies the location of a Base64-encoded
- *                    PNG thumbnail. It is slower as classic but most flexible. It does _not_
+ *                    PNG thumbnail. It is slower as classic but most flexible. It does not
  *                    require dedicated post-processing of gcode files for most slicers.
  *                    "RGB565 bitmap" and "Classic" are used as fallback.
  */
