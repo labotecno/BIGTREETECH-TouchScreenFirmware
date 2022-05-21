@@ -16,6 +16,7 @@ const uint16_t default_pause_speed[]   = {NOZZLE_PAUSE_XY_FEEDRATE, NOZZLE_PAUSE
 const uint16_t default_level_speed[]   = {LEVELING_XY_FEEDRATE, LEVELING_Z_FEEDRATE};
 const uint16_t default_preheat_ext[]   = PREHEAT_HOTEND;
 const uint16_t default_preheat_bed[]   = PREHEAT_BED;
+const uint8_t default_led_color[]      = {LED_R, LED_G, LED_B, LED_W, LED_P, LED_I};
 const uint8_t default_custom_enabled[] = CUSTOM_GCODE_ENABLED;
 
 // Init settings data with default values
@@ -24,6 +25,7 @@ void initSettings(void)
 // General Settings
   infoSettings.general_settings       = ((0 << INDEX_LISTENING_MODE) | (EMULATED_M600 << INDEX_EMULATED_M600) |
                                          (EMULATED_M109_M190 << INDEX_EMULATED_M109_M190) |
+                                         (EVENT_LED << INDEX_EVENT_LED) |
                                          (FILE_COMMENT_PARSING << INDEX_FILE_COMMENT_PARSING));
 
 // UI Settings
@@ -45,6 +47,7 @@ void initSettings(void)
   infoSettings.ack_notification       = ACK_NOTIFICATION;
   infoSettings.files_sort_by          = FILES_SORT_BY;
   infoSettings.files_list_mode        = FILES_LIST_MODE;
+  infoSettings.filename_extension     = FILENAME_EXTENSION;
   infoSettings.fan_percentage         = FAN_SPEED_PERCENTAGE;
   infoSettings.persistent_info        = PERSISTENT_INFO;
   infoSettings.terminal_ack           = TERMINAL_ACK;
@@ -119,6 +122,7 @@ void initSettings(void)
   infoSettings.lcd_idle_brightness    = LCD_IDLE_BRIGHTNESS;
   infoSettings.lcd_idle_time          = LCD_IDLE_TIME;
   infoSettings.lcd_lock_on_idle       = LCD_LOCK_ON_IDLE;
+  infoSettings.led_always_on          = LED_ALWAYS_ON;
   infoSettings.knob_led_color         = KNOB_LED_COLOR;
   infoSettings.knob_led_idle          = KNOB_LED_IDLE;
   #ifdef NEOPIXEL_PIXELS
@@ -170,6 +174,11 @@ void initSettings(void)
     infoSettings.level_feedrate[i]    = default_level_speed[i];
   }
 
+  for (int i = 0; i < LED_COLOR_COMPONENT_COUNT - 1 ; i++)
+  {
+    infoSettings.led_color[i]         = default_led_color[i];
+  }
+
   resetConfig();
 }
 
@@ -189,6 +198,7 @@ void initMachineSettings(void)
   infoMachineSettings.emergencyParser         = DISABLED;
   infoMachineSettings.promptSupport           = DISABLED;
   infoMachineSettings.onboardSD               = DISABLED;
+  infoMachineSettings.multiVolume             = DISABLED;
   infoMachineSettings.autoReportSDStatus      = DISABLED;
   infoMachineSettings.longFilename            = DISABLED;
   infoMachineSettings.babyStepping            = DISABLED;
@@ -206,7 +216,7 @@ void setupMachine(FW_TYPE fwType)
     return;
 
   if (GET_BIT(infoSettings.general_settings, INDEX_LISTENING_MODE) == 1)  // if TFT in listening mode, display a reminder message
-    reminderMessage(LABEL_LISTENING, STATUS_LISTENING);
+    reminderMessage(LABEL_LISTENING, SYS_STATUS_LISTENING);
 
   infoMachineSettings.firmwareType = fwType;
 
@@ -253,6 +263,9 @@ void setupMachine(FW_TYPE fwType)
   }
 
   mustStoreCmd("G90\n");  // Set to Absolute Positioning
+
+  if (infoSettings.led_always_on == 1)
+    LED_SendColor(&ledColor);  // set (neopixel) LED light to current color (initialized in HW_Init function)
 }
 
 float flashUsedPercentage(void)

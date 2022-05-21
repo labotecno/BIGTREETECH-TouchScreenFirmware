@@ -19,26 +19,26 @@ static inline void drawProbeAccuracyIcon(MENUITEMS * levelItems)
   uint8_t index = 4;
   GUI_POINT loc;
   LIVE_INFO lvIcon;
-  const ITEM * menuitem = &levelItems->items[valIconIndex[index]];
   char * str = "M48";
 
   loc.x = 5;
   loc.y = ICON_HEIGHT - 5;
 
+  lvIcon.iconIndex = levelItems->items[valIconIndex[index]].icon;
   lvIcon.enabled[0] = true;
   lvIcon.enabled[1] = true;
   lvIcon.enabled[2] = false;
 
   lvIcon.lines[0].h_align = LEFT;
   lvIcon.lines[0].v_align = BOTTOM;
-  lvIcon.lines[0].fn_color = ORANGE;
+  lvIcon.lines[0].fn_color = LC_VAL_COLOR;
   lvIcon.lines[0].text_mode = GUI_TEXTMODE_TRANS;
   lvIcon.lines[0].pos = loc;
   lvIcon.lines[0].font = FONT_SIZE_NORMAL;
 
   lvIcon.lines[1].h_align = LEFT;
   lvIcon.lines[1].v_align = BOTTOM;
-  lvIcon.lines[1].fn_color = WHITE;
+  lvIcon.lines[1].fn_color = LC_VAL_COLOR_2;
   lvIcon.lines[1].text_mode = GUI_TEXTMODE_TRANS;
   lvIcon.lines[1].pos = (GUI_POINT){loc.x - 2, loc.y - 2};
   lvIcon.lines[1].font = FONT_SIZE_NORMAL;
@@ -46,7 +46,7 @@ static inline void drawProbeAccuracyIcon(MENUITEMS * levelItems)
   lvIcon.lines[0].text = (uint8_t *)str;
   lvIcon.lines[1].text = (uint8_t *)str;
 
-  showLiveInfo(valIconIndex[index], &lvIcon, menuitem);
+  showLiveInfo(valIconIndex[index], &lvIcon, false);
 }
 
 void menuLevelCorner(void)
