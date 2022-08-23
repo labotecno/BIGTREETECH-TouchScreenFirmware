@@ -10,7 +10,6 @@ typedef enum
   UNLOAD_STARTED,
 } CMD_TYPE;
 
-// 1 title, ITEM_PER_PAGE items (icon + label)
 const MENUITEMS loadUnloadItems = {
   // title
   LABEL_LOAD_UNLOAD,
@@ -33,7 +32,7 @@ CMD_TYPE lastCmd = NONE;
 // set the hotend to the minimum extrusion temperature if user selected "OK"
 void loadMinTemp_OK(void)
 {
-  heatSetTargetTemp(tool_index, infoSettings.min_ext_temp);
+  heatSetTargetTemp(tool_index, infoSettings.min_ext_temp, FROM_GUI);
 }
 
 void menuLoadUnload(void)
@@ -44,7 +43,7 @@ void menuLoadUnload(void)
   {
     loopProcessToCondition(&isNotEmptyCmdQueue);  // wait for the communication to be clean
 
-    eAxisBackup.coordinate = ((infoFile.source >= BOARD_SD) ? coordinateGetAxisActual(E_AXIS) : coordinateGetAxisTarget(E_AXIS));
+    eAxisBackup.coordinate = coordinateGetAxis(E_AXIS);
     eAxisBackup.handled = true;
   }
 
@@ -91,7 +90,7 @@ void menuLoadUnload(void)
           int16_t val = editIntValue(0, infoSettings.max_temp[tool_index], 0, actTarget);
 
           if (val != actTarget)
-            heatSetTargetTemp(tool_index, val);
+            heatSetTargetTemp(tool_index, val, FROM_GUI);
 
           temperatureReDraw(tool_index, NULL, false);
           lastCmd = NONE;
@@ -106,7 +105,7 @@ void menuLoadUnload(void)
           break;
 
         case KEY_ICON_5:  // heat menu
-          heatSetCurrentIndex(currentTool);  // preselect current nozzle for "Heat" menu
+          heatSetCurrentIndex(tool_index);  // preselect current nozzle for "Heat" menu
           OPEN_MENU(menuHeat);
           eAxisBackup.handled = false;  // exiting from Extrude menu (user might never come back by "Back" long press in Heat menu)
           lastCmd = NONE;
@@ -118,7 +117,7 @@ void menuLoadUnload(void)
           break;
 
         case KEY_ICON_7:  // back
-          cooldownTemperature();
+          COOLDOWN_TEMPERATURE();
           lastCmd = NONE;
           CLOSE_MENU();
           eAxisBackup.handled = false;  // the user exited from menu (not any other process/popup/etc)

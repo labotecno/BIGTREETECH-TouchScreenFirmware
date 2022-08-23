@@ -16,6 +16,7 @@ const uint16_t default_pause_speed[]   = {NOZZLE_PAUSE_XY_FEEDRATE, NOZZLE_PAUSE
 const uint16_t default_level_speed[]   = {LEVELING_XY_FEEDRATE, LEVELING_Z_FEEDRATE};
 const uint16_t default_preheat_ext[]   = PREHEAT_HOTEND;
 const uint16_t default_preheat_bed[]   = PREHEAT_BED;
+const uint8_t default_led_color[]      = {LED_R, LED_G, LED_B, LED_W, LED_P, LED_I};
 const uint8_t default_custom_enabled[] = CUSTOM_GCODE_ENABLED;
 
 // Init settings data with default values
@@ -51,6 +52,7 @@ void initSettings(void)
   infoSettings.persistent_info        = PERSISTENT_INFO;
   infoSettings.terminal_ack           = TERMINAL_ACK;
   infoSettings.notification_m117      = NOTIFICATION_M117;
+  infoSettings.prog_source            = PROG_SOURCE;
   infoSettings.prog_disp_type         = PROG_DISP_TYPE;
   infoSettings.layer_disp_type        = LAYER_DISP_TYPE;
 
@@ -121,6 +123,7 @@ void initSettings(void)
   infoSettings.lcd_idle_brightness    = LCD_IDLE_BRIGHTNESS;
   infoSettings.lcd_idle_time          = LCD_IDLE_TIME;
   infoSettings.lcd_lock_on_idle       = LCD_LOCK_ON_IDLE;
+  infoSettings.led_always_on          = LED_ALWAYS_ON;
   infoSettings.knob_led_color         = KNOB_LED_COLOR;
   infoSettings.knob_led_idle          = KNOB_LED_IDLE;
   #ifdef NEOPIXEL_PIXELS
@@ -172,6 +175,11 @@ void initSettings(void)
     infoSettings.level_feedrate[i]    = default_level_speed[i];
   }
 
+  for (int i = 0; i < LED_COLOR_COMPONENT_COUNT - 1 ; i++)
+  {
+    infoSettings.led_color[i]         = default_led_color[i];
+  }
+
   resetConfig();
 }
 
@@ -191,6 +199,7 @@ void initMachineSettings(void)
   infoMachineSettings.emergencyParser         = DISABLED;
   infoMachineSettings.promptSupport           = DISABLED;
   infoMachineSettings.onboardSD               = DISABLED;
+  infoMachineSettings.multiVolume             = DISABLED;
   infoMachineSettings.autoReportSDStatus      = DISABLED;
   infoMachineSettings.longFilename            = DISABLED;
   infoMachineSettings.babyStepping            = DISABLED;
@@ -208,24 +217,21 @@ void setupMachine(FW_TYPE fwType)
     return;
 
   if (GET_BIT(infoSettings.general_settings, INDEX_LISTENING_MODE) == 1)  // if TFT in listening mode, display a reminder message
-    reminderMessage(LABEL_LISTENING, STATUS_LISTENING);
+    reminderMessage(LABEL_LISTENING, SYS_STATUS_LISTENING);
 
   infoMachineSettings.firmwareType = fwType;
 
   #if BED_LEVELING_TYPE > 1  // if not disabled and not auto-detect
     #if BED_LEVELING_TYPE == 2
-        infoMachineSettings.leveling = BL_ABL;
+      infoMachineSettings.leveling = BL_ABL;
     #elif BED_LEVELING_TYPE == 3
-        infoMachineSettings.leveling = BL_BBL;
+      infoMachineSettings.leveling = BL_BBL;
     #elif BED_LEVELING_TYPE == 4
-        infoMachineSettings.leveling = BL_UBL;
+      infoMachineSettings.leveling = BL_UBL;
     #elif BED_LEVELING_TYPE == 5
-        infoMachineSettings.leveling = BL_MBL;
+      infoMachineSettings.leveling = BL_MBL;
     #endif
   #endif
-
-  if (infoMachineSettings.leveling != BL_DISABLED && infoMachineSettings.EEPROM == 1 && infoSettings.auto_load_leveling == 1)
-    storeCmd("M420 S1\n");
 
   if (infoSettings.onboard_sd != AUTO)
     infoMachineSettings.onboardSD = infoSettings.onboard_sd;
@@ -233,28 +239,35 @@ void setupMachine(FW_TYPE fwType)
   if (infoSettings.long_filename != AUTO)
     infoMachineSettings.longFilename = infoSettings.long_filename;
 
-  if (infoMachineSettings.firmwareType == FW_SMOOTHIEWARE)  // Smoothieware does not report detailed M115 capabilities
-  {
-    infoMachineSettings.leveling        = BL_ABL;
-    infoMachineSettings.emergencyParser = ENABLED;
-  }
-  else if (infoMachineSettings.firmwareType == FW_REPRAPFW)
-  {
-    infoMachineSettings.softwareEndstops = ENABLED;
+  if (infoMachineSettings.firmwareType == FW_REPRAPFW)  // RRF does not report detailed M115 capabilities
+  { // set only the values that differ from the ones initialized in initMachineSettings() function
+    #if BED_LEVELING_TYPE == 1  // if auto-detect is enabled
+      infoMachineSettings.leveling = BL_ABL;
+    #endif
 
     mustStoreCmd("M552\n");  // query network state, populate IP if the screen boots up after RRF
-    return;
+  }
+  else if (infoMachineSettings.firmwareType == FW_SMOOTHIEWARE)  // Smoothieware does not report detailed M115 capabilities
+  { // set only the values that differ from the ones initialized in initMachineSettings() function
+    #if BED_LEVELING_TYPE == 1  // if auto-detect is enabled
+      infoMachineSettings.leveling = BL_ABL;
+    #endif
   }
 
+  if (infoMachineSettings.leveling != BL_DISABLED && infoMachineSettings.EEPROM == 1 && infoSettings.auto_load_leveling == 1)
+    mustStoreCmd("M420 S1\n");
+
   mustStoreCmd("M503 S0\n");
+  mustStoreCmd("G90\n");  // set to absolute positioning
 
   if (infoSettings.hotend_count > 0)
   {
-    // This is good, but we need to set the extruder number first, and it's defaulting to 1.
-    mustStoreCmd("M82\n");  // Set extruder to absolute mode
+    // this is good, but we need to set the extruder number first, and it's defaulting to 1
+    mustStoreCmd("M82\n");  // set extruder to absolute mode
   }
 
-  mustStoreCmd("G90\n");  // Set to Absolute Positioning
+  if (infoSettings.led_always_on == 1)
+    LED_SendColor(&ledColor);  // set (neopixel) LED light to current color (initialized in HW_Init function)
 }
 
 float flashUsedPercentage(void)

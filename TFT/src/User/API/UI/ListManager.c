@@ -21,7 +21,7 @@ static void (*action_prepareItem)(LISTITEM * item, uint16_t index, uint8_t itemP
  * @brief Set and innitialize list menu
  *
  * @param title Title of menu
- * @param items Preset list of items. Set to NUll if not used.
+ * @param items Preset list of items. Set to NULL if not used.
  * @param maxItems Maximum number of items possilbe in current list.
  * @param curPage Display this page index.
  * @param handleBackPress Set true to handle back button automatically.
@@ -54,7 +54,7 @@ void listViewCreate(LABEL title, LISTITEM * items, uint16_t maxItems, uint16_t *
 void listViewSetTitle(LABEL title)
 {
   listItems.title = title;
-  menuDrawTitle(labelGetAddress(&listItems.title));
+  menuSetTitle(&listItems.title);
 }
 
 // Get current displayed pade index
