@@ -22,6 +22,14 @@ extern "C" {
 
 typedef enum
 {
+  PROG_FILE = 0,  // file execution progress ()
+  PROG_RRF,       // progress from RRF ("fraction_printed")
+  PROG_TIME,      // time based progress (elapsed/total)
+  PROG_SLICER,    // progress from slicer (M73)
+} PROG_FROM;
+
+typedef enum
+{
   PAUSE_NORMAL = 0,
   PAUSE_M0,
   PAUSE_EXTERNAL,
@@ -35,6 +43,7 @@ typedef struct
   float length;
   float weight;
   float cost;
+  bool hasFilamentData;
 } PRINT_SUMMARY;
 
 extern PRINT_SUMMARY infoPrintSummary;
@@ -52,7 +61,7 @@ void resumeAndContinue(void);
 void setPrintExpectedTime(uint32_t expectedTime);
 uint32_t getPrintExpectedTime(void);
 
-void setPrintTime(uint32_t elapsedTime);
+void updatePrintTime(uint32_t osTime);
 uint32_t getPrintTime(void);
 
 void setPrintRemainingTime(int32_t remainingTime);  // used for M73 Rxx and M117 Time Left xx
@@ -65,12 +74,22 @@ uint16_t getPrintLayerNumber();
 void setPrintLayerCount(uint16_t layerCount);
 uint16_t getPrintLayerCount();
 
-uint32_t getPrintSize(void);
-uint32_t getPrintCur(void);
+void setPrintProgressSource(PROG_FROM progressSource);
+PROG_FROM getPrintProgressSource(void);
 
-void setPrintProgress(float cur, float size);
-void setPrintProgressPercentage(uint8_t percentage);  // used by M73 Pxx
-bool updatePrintProgress(void);
+//
+// used for print based on gcode file
+//
+uint32_t getPrintDataSize(void);
+uint32_t getPrintDataCur(void);
+void setPrintProgressData(float cur, float size);
+
+//
+// used for print based on M73 Pxx or RRF
+//
+void setPrintProgressPercentage(uint8_t percentage);
+
+uint8_t updatePrintProgress(void);
 uint8_t getPrintProgress(void);
 
 void setPrintRunout(bool runout);
@@ -109,6 +128,7 @@ bool printPause(bool isPause, PAUSE_TYPE pauseType);
 
 bool isPrinting(void);
 bool isPaused(void);
+bool isAborted(void);
 bool isTFTPrinting(void);
 bool isHostPrinting(void);
 bool isRemoteHostPrinting(void);

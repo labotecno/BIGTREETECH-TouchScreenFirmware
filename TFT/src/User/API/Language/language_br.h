@@ -56,6 +56,8 @@
     #define STRING_FWRECOVER              "Firmware retraction rec." // TRADUZIR
     #define STRING_RETRACT_AUTO           "Retração de Firmware Auto."
     #define STRING_HOTEND_OFFSET          "Offset de acordo com hotend" //
+    #define STRING_HOTEND_PID             "Hotend PID"
+    #define STRING_BED_PID                "Bed PID"
     #define STRING_STEALTH_CHOP           "TMC StealthChop"
     #define STRING_DELTA_CONFIGURATION    "Configuração Delta"
     #define STRING_DELTA_TOWER_ANGLE      "Guarnição do ângulo da torre" //
@@ -297,6 +299,7 @@
     #define STRING_ABL_SLOT_EEPROM        "Salva MESH na EEPROM para ler após inicialização?"
     #define STRING_ABL_Z                  "Z Fade"
     #define STRING_LEVEL_CORNER           "Cantos"
+    #define STRING_LEVEL_CORNER_INFO      "Edge distance is below probe offset X/Y and some target points could be not reachable.\nDo you want to use a safe edge distance?"
     #define STRING_P_OFFSET               "P Offset"
     #define STRING_H_OFFSET               "H Offset"
     #define STRING_DISTANCE               "Distância"
@@ -330,16 +333,15 @@
     #define STRING_MAINMENU               "Menu"
     #define STRING_LEVELING_EDGE_DISTANCE "Distância da borda"
     #define STRING_TUNING                 "Ajuste"// TRADUZIR MELHOR
+    #define STRING_MPC                    "MPC"
+    #define STRING_MPC_TITLE              "Auto Ajuste do MPC"
     #define STRING_PID                    "PID"
     #define STRING_PID_TITLE              "Auto Ajuste do PID"
-    #define STRING_PID_START_INFO         "O Auto Ajuste do PID começará. Isso pode demorar. \nContinua?"
-    #define STRING_PID_START_INFO_2       "Autoajuste do PID em andamento!"
-    #define STRING_PID_START_INFO_3       "NÃO TOQUE na tela até completar!"
+    #define STRING_TUNE_START_INFO        "O Auto Ajuste começará. Isso pode demorar. \nContinua?"
     #define STRING_TUNE_EXTRUDER          "Passos/mm E"
     #define STRING_TUNE_EXT_EXTRUDE_100   "Extr. 100mm"
     #define STRING_TUNE_EXT_TEMP          "Extr. ajuste | Aquece"
     #define STRING_TUNE_EXT_MARK120MM     "Marque o filamento em 120mm \nPressione '%s' quando estiver pronto \nMeça o comprimento marcado após a extrusão"
-    #define STRING_TUNE_EXT_HEATOFF       "Desliguar o Hotend?"
     #define STRING_TUNE_EXT_ADJ_ESTEPS    "Ajustar passos/mm E"
     #define STRING_TUNE_EXT_ESTEPS_SAVED  "Novos passos/mm E definidos\nNão se esqueça de salvar na EEPROM\nNovo valor: %0.2f"
     #define STRING_TUNE_EXT_MEASURED      "Comprimento restante:"

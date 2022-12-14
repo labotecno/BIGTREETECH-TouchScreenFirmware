@@ -3,36 +3,20 @@
 
 #define ITEM_TUNE_EXTRUDER_LEN_NUM 4
 
-#define EXTRUDE_LEN 100.0f  // in MM
+#define EXTRUDE_LEN 100.0f   // in mm
+#define REMAINING_LEN 20.0f  // in mm
 
 static uint8_t tool_index = NOZZLE0;
 static uint8_t degreeSteps_index = 1;
 static uint8_t extStep_index = 0;
 static bool loadRequested = false;
 
-// set the hotend to the minimum extrusion temperature if user selected "OK"
-void extrudeMinTemp_OK(void)
-{
-  heatSetTargetTemp(tool_index, infoSettings.min_ext_temp);
-}
-
-static inline void turnHeaterOff(void)
-{
-  heatSetTargetTemp(tool_index, 0);
-  CLOSE_MENU();
-}
-
-static inline void returnToTuning(void)
-{
-  CLOSE_MENU();
-}
-
 void showNewESteps(const float measured_length, const float old_esteps, float * new_esteps)
 {
   char tempstr[20];
 
   // First we calculate the new E-step value:
-  *new_esteps = (EXTRUDE_LEN * old_esteps) / (EXTRUDE_LEN - (measured_length - 20));
+  *new_esteps = (EXTRUDE_LEN * old_esteps) / (EXTRUDE_LEN - (measured_length - REMAINING_LEN));
 
   GUI_DispString(exhibitRect.x0, exhibitRect.y0, textSelect(LABEL_TUNE_EXT_MEASURED));
 
@@ -48,20 +32,25 @@ void showNewESteps(const float measured_length, const float old_esteps, float * 
 
 static inline void extrudeFilament(void)
 {
-  // Home extruder
-  mustStoreScript("G28\nG90\n");
+  // check and adopt current E-steps
+  mustStoreCmd("M92\n");
+  infoParameters.StepsPerMM[E_AXIS] = 0;  // reset E-steps value
 
-  if (tool_index != heatGetCurrentTool())
-    storeCmd("%s\n", tool_change[tool_index]);
+  while (infoParameters.StepsPerMM[E_AXIS] == 0)  // wait until E-steps is updated
+  {
+    loopProcess();
+  }
+
+  // Home extruder and set absolute positioning
+  mustStoreScript("G28\nG90\n");
 
   // Raise Z axis to pause height
   #if DELTA_PROBE_TYPE != 0
-    mustStoreCmd("G0 Z%.3f F%d\n", coordinateGetAxisActual(Z_AXIS) - infoSettings.pause_z_raise,
-                 infoSettings.pause_feedrate[FEEDRATE_Z]);
+    mustStoreCmd("G0 Z200 F%d\n", infoSettings.pause_feedrate[FEEDRATE_Z]);
   #else
     mustStoreCmd("G0 Z%.3f F%d\n", coordinateGetAxisActual(Z_AXIS) + infoSettings.pause_z_raise,
                  infoSettings.pause_feedrate[FEEDRATE_Z]);
-  #endif        
+  #endif
   // Move to pause location
   mustStoreCmd("G0 X%.3f Y%.3f F%d\n", infoSettings.pause_pos[X_AXIS], infoSettings.pause_pos[Y_AXIS],
                infoSettings.pause_feedrate[FEEDRATE_XY]);
@@ -70,7 +59,6 @@ static inline void extrudeFilament(void)
 
   OPEN_MENU(menuNewExtruderESteps);
 }
-// end Esteps part
 
 void menuTuneExtruder(void)
 {
@@ -101,7 +89,7 @@ void menuTuneExtruder(void)
   tuneExtruderItems.items[KEY_ICON_5] = itemDegreeSteps[degreeSteps_index];
 
   menuDrawPage(&tuneExtruderItems);
-  temperatureReDraw(tool_index, NULL, false);
+  temperatureReDraw(tool_index, NULL, true);
 
   while (MENU_IS(menuTuneExtruder))
   {
@@ -113,7 +101,7 @@ void menuTuneExtruder(void)
     {
       case KEY_ICON_0:
       case KEY_DECREASE:
-        heatSetTargetTemp(tool_index, actTarget - degreeSteps[degreeSteps_index]);
+        heatSetTargetTemp(tool_index, actTarget - degreeSteps[degreeSteps_index], FROM_GUI);
         break;
 
       case KEY_INFOBOX:
@@ -121,21 +109,21 @@ void menuTuneExtruder(void)
         int16_t val = editIntValue(0, infoSettings.max_temp[tool_index], 0, actTarget);
 
         if (val != actTarget)
-          heatSetTargetTemp(tool_index, val);
+          heatSetTargetTemp(tool_index, val, FROM_GUI);
 
-        temperatureReDraw(tool_index, NULL, false);
+        temperatureReDraw(tool_index, NULL, true);
         break;
       }
 
       case KEY_ICON_3:
       case KEY_INCREASE:
-        heatSetTargetTemp(tool_index, actTarget + degreeSteps[degreeSteps_index]);
+        heatSetTargetTemp(tool_index, actTarget + degreeSteps[degreeSteps_index], FROM_GUI);
         break;
 
       case KEY_ICON_4:
         tool_index = (tool_index + 1) % infoSettings.ext_count;
 
-        temperatureReDraw(tool_index, NULL, false);
+        temperatureReDraw(tool_index, NULL, true);
         break;
 
       case KEY_ICON_5:
@@ -150,15 +138,8 @@ void menuTuneExtruder(void)
         break;
 
       case KEY_ICON_7:
-        if (heatGetTargetTemp(tool_index) > 0)
-        {
-          setDialogText(tuneExtruderItems.title.index, LABEL_TUNE_EXT_HEATOFF, LABEL_CONFIRM, LABEL_CANCEL);
-          showDialog(DIALOG_TYPE_QUESTION, turnHeaterOff, returnToTuning, NULL);
-        }
-        else
-        {
-          CLOSE_MENU();
-        }
+        COOLDOWN_TEMPERATURE();
+        CLOSE_MENU();
         break;
 
       default:
@@ -167,7 +148,10 @@ void menuTuneExtruder(void)
 
     if (loadRequested == true)
     {
-      switch (warmupNozzle(tool_index, extrudeMinTemp_OK))
+      if (tool_index != heatGetCurrentTool())
+        mustStoreCmd("%s\n", tool_change[tool_index]);
+
+      switch (warmupNozzle())
       {
         case COLD:
           loadRequested = false;
@@ -183,8 +167,7 @@ void menuTuneExtruder(void)
             LABELCHAR(tempStr, LABEL_TUNE_EXT_MARK120MM);
 
             sprintf(tempMsg, tempStr, textSelect(LABEL_EXTRUDE));
-            setDialogText(tuneExtruderItems.title.index, (uint8_t *) tempMsg, LABEL_EXTRUDE, LABEL_CANCEL);
-            showDialog(DIALOG_TYPE_QUESTION, extrudeFilament, NULL, NULL);
+            popupDialog(DIALOG_TYPE_QUESTION, tuneExtruderItems.title.index, (uint8_t *) tempMsg, LABEL_EXTRUDE, LABEL_CANCEL, extrudeFilament, NULL, NULL);
           }
           loadRequested = false;
           break;
@@ -195,7 +178,7 @@ void menuTuneExtruder(void)
     {
       lastCurrent = actCurrent;
       lastTarget = actTarget;
-      temperatureReDraw(tool_index, NULL, true);
+      temperatureReDraw(tool_index, NULL, false);
     }
 
     loopProcess();
@@ -229,10 +212,8 @@ void menuNewExtruderESteps(void)
 
   KEY_VALUES key_num = KEY_IDLE;
   float measured_length;
-  float now = measured_length = 20.00f;
+  float now = measured_length = REMAINING_LEN;
   float old_esteps, new_esteps;  // get the value of the E-steps
-
-  mustStoreCmd("M503 S0\n");
 
   old_esteps = getParameter(P_STEPS_PER_MM, E_AXIS);  // get the value of the E-steps
 

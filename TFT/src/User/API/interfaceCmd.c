@@ -49,10 +49,12 @@ bool isNotEmptyCmdQueue(void)
 bool isEnqueued(const CMD cmd)
 {
   bool found = false;
+
   for (int i = 0; i < infoCmd.count && !found; ++i)
   {
     found = strcmp(cmd, infoCmd.queue[(infoCmd.index_r + i) % CMD_QUEUE_SIZE].gcode) == 0;
   }
+
   return found;
 }
 
@@ -127,6 +129,7 @@ void mustStoreScript(const char * format, ...)
   char * p = script;
   uint16_t i = 0;
   CMD cmd;
+
   for (;;)
   {
     char c = *p++;
@@ -190,6 +193,7 @@ bool moveCacheToCmd(void)
   storeCmd("%s", infoCacheCmd.queue[infoCacheCmd.index_r].gcode);
   infoCacheCmd.count--;
   infoCacheCmd.index_r = (infoCacheCmd.index_r + 1) % CMD_QUEUE_SIZE;
+
   return true;
 }
 
@@ -213,12 +217,6 @@ static inline bool getCmd(void)
   return (cmd_port_index == PORT_1);  // if gcode is originated by TFT (SERIAL_PORT), return true
 }
 
-void updateCmd(const char * buf)
-{
-  strcat(cmd_ptr, buf);       // append buf to gcode
-  cmd_len = strlen(cmd_ptr);  // new length of gcode
-}
-
 // Send gcode cmd to printer and remove leading gcode cmd from infoCmd queue.
 bool sendCmd(bool purge, bool avoidTerminal)
 {
@@ -232,8 +230,10 @@ bool sendCmd(bool purge, bool avoidTerminal)
     // dump serial data sent to debug port
     Serial_Puts(SERIAL_DEBUG_PORT, serialPort[cmd_port_index].id);  // serial port ID (e.g. "2" for SERIAL_PORT_2)
     Serial_Puts(SERIAL_DEBUG_PORT, ">>");
+
     if (purge)
       Serial_Puts(SERIAL_DEBUG_PORT, purgeStr);
+
     Serial_Puts(SERIAL_DEBUG_PORT, cmd_ptr);
   #endif
 
@@ -243,13 +243,15 @@ bool sendCmd(bool purge, bool avoidTerminal)
       Serial_Puts(SERIAL_PORT, cmd_ptr);
     else
       rrfSendCmd(cmd_ptr);
+
     setCurrentAckSrc(cmd_port_index);
   }
 
-  if (!avoidTerminal)
+  if (!avoidTerminal && MENU_IS(menuTerminal))
   {
     if (purge)
       terminalCache(purgeStr, strlen(purgeStr), cmd_port_index, SRC_TERMINAL_GCODE);
+
     terminalCache(cmd_ptr, cmd_len, cmd_port_index, SRC_TERMINAL_GCODE);
   }
 
@@ -266,28 +268,32 @@ static bool cmd_seen_from(uint8_t index, const char * keyword)
   if (index >= cmd_len)
     return false;
 
-  char * strPtr = strstr(cmd_ptr + index, keyword);
-
-  if (strPtr != NULL)
+  for (uint16_t i = 0; cmd_ptr[index] != '\0'; index++, i = 0)
   {
-    cmd_index = (strPtr - cmd_ptr) + strlen(keyword);
-    return true;
+    while (keyword[i] == cmd_ptr[index + i])
+    {
+      if (keyword[++i] == '\0')
+      {
+        cmd_index = index + i;
+        return true;
+      }
+    }
   }
 
   return false;
 }
 
 // Check the presence of the specified "code" character in the current gcode command.
-static bool cmd_seen(char code)
+static bool cmd_seen(const char code)
 {
-  for (cmd_index = cmd_base_index; cmd_index < cmd_len; cmd_index++)
+  cmd_index = cmd_base_index;
+
+  while (cmd_ptr[cmd_index] != '\0')
   {
-    if (cmd_ptr[cmd_index] == code)
-    {
-      cmd_index += 1;
+    if (cmd_ptr[cmd_index++] == code)
       return true;
-    }
   }
+
   return false;
 }
 
@@ -295,6 +301,17 @@ static bool cmd_seen(char code)
 static int32_t cmd_value(void)
 {
   return (strtol(&cmd_ptr[cmd_index], NULL, 10));
+}
+
+// Get the int after "/", if any.
+static int32_t cmd_second_value(void)
+{
+  char * secondValue = strchr(&cmd_ptr[cmd_index], '/');
+
+  if (secondValue != NULL)
+    return (strtol(secondValue + 1, NULL, 10));
+  else
+    return -0.5;
 }
 
 // Get the float after "code". Call after cmd_seen(code).
@@ -423,31 +440,29 @@ void writeRemoteTFT()
   Serial_Puts(cmd_port, "ok\n");
 }
 
-void setNoWaitHeating(uint8_t index)
+void setWaitHeating(uint8_t index)
 {
   if (cmd_seen('R'))
   {
     cmd_ptr[cmd_index - 1] = 'S';
-    heatSetIsWaiting(index, WAIT_COOLING_HEATING);
+    heatSetIsWaiting(index, true);
   }
-  else
+  else if (cmd_seen('S'))
   {
-    heatSetIsWaiting(index, WAIT_HEATING);
+    heatSetIsWaiting(index, (cmd_value() > heatGetCurrentTemp(index) - TEMPERATURE_RANGE));
   }
 }
 
-void synchNoWaitHeating(uint8_t index)
+void syncTargetTemp(uint8_t index)
 {
+  uint16_t temp;
+
   if (cmd_seen('S'))
   {
-    heatSyncTargetTemp(index, cmd_value());
-  }
-  else if (!cmd_seen('\n'))
-  {
-    char buf[12];
-    sprintf(buf, "S%u\n", heatGetTargetTemp(index));
-    updateCmd(buf);
-    heatSetSendWaiting(index, false);
+    temp = cmd_value();
+
+    if (temp != heatGetTargetTemp(index))
+      heatSetTargetTemp(index, temp, FROM_CMD);
   }
 }
 
@@ -643,7 +658,7 @@ void sendQueueCmd(void)
                   Serial_Puts(cmd_port, ".\n");
                 }
 
-                sprintf(buf, "%s printing byte %d/%d\n", (infoFile.source == FS_TFT_SD) ? "TFT SD" : "TFT USB", getPrintCur(), getPrintSize());
+                sprintf(buf, "%s printing byte %d/%d\n", (infoFile.source == FS_TFT_SD) ? "TFT SD" : "TFT USB", getPrintDataCur(), getPrintDataSize());
                 Serial_Puts(cmd_port, buf);
                 Serial_Puts(cmd_port, "ok\n");
 
@@ -778,12 +793,18 @@ void sendQueueCmd(void)
 
         case 73:
           if (cmd_seen('P'))
+          {
+            setPrintProgressSource(PROG_SLICER);
             setPrintProgressPercentage(cmd_value());
+          }
 
           if (cmd_seen('R'))
           {
             setPrintRemainingTime((cmd_value() * 60));
-            setM73R_presence(true);  // disable parsing remaning time from gcode comments
+            setTimeFromSlicer(true);  // disable parsing remaning time from gcode comments
+
+            if (getPrintProgressSource() < PROG_TIME && infoSettings.prog_source == 1)
+              setPrintProgressSource(PROG_TIME);
           }
 
           if (!infoMachineSettings.buildPercent)  // if M73 is not supported by Marlin, skip it
@@ -839,16 +860,8 @@ void sendQueueCmd(void)
             heatSetUpdateWaiting(false);
 
             if (cmd_seen('S'))
-            {
               heatSyncUpdateSeconds(cmd_value());
-            }
-            else if (!cmd_seen('\n'))
-            {
-              char buf[12];
 
-              sprintf(buf, "S%u\n", heatGetUpdateSeconds());
-              updateCmd(buf);
-            }
           }
           break;
 
@@ -874,14 +887,14 @@ void sendQueueCmd(void)
             if (GET_BIT(infoSettings.general_settings, INDEX_EMULATED_M109_M190) == 0)  // if emulated M109 / M190 is disabled
               break;
 
-            cmd_ptr[cmd_base_index + 3] = '4';  // avoid to send M109 to Marlin
-            setNoWaitHeating(cmd_seen('T') ? cmd_value() : heatGetCurrentHotend());
+            cmd_ptr[cmd_base_index + 3] = '4';  // avoid to send M109 to Marlin, send M104
+            setWaitHeating(cmd_seen('T') ? cmd_value() : heatGetCurrentHotend());
           }
         // no break here. The data processing of M109 is the same as that of M104 below
         case 104:  // M104
           if (fromTFT)
           {
-            synchNoWaitHeating(cmd_seen('T') ? cmd_value() : heatGetCurrentHotend());
+            syncTargetTemp(cmd_seen('T') ? cmd_value() : heatGetCurrentHotend());
           }
           break;
 
@@ -893,9 +906,22 @@ void sendQueueCmd(void)
           break;
 
         case 117:  // M117
-          if (cmd_seen_from(cmd_base_index, "Time Left"))
+          if (cmd_seen_from(cmd_base_index, "Time Left"))  // parsing printing time left
           {
+            // format: Time Left <XX>h<YY>m<ZZ>s (e.g. Time Left 02h04m06s)
             parsePrintRemainingTime(&cmd_ptr[cmd_index]);  // cmd_index was set by cmd_seen_from function
+            setTimeFromSlicer(true);
+          }
+          else if (cmd_seen_from(cmd_base_index, "Layer Left"))  // parsing printing layer left
+          {
+            // format: Layer Left <XXXX>/<YYYY> (e.g. Layer Left 51/940)
+            setPrintLayerNumber(cmd_value());
+            setPrintLayerCount(cmd_second_value());
+          }
+          else if (cmd_seen_from(cmd_base_index, "Data Left"))  // parsing printing data left
+          {
+            // format: Data Left <XXXX>/<YYYY> (e.g. Data Left 123/12345)
+            setPrintProgressData(cmd_value(), cmd_second_value());
           }
           else
           {
@@ -917,28 +943,28 @@ void sendQueueCmd(void)
             if (GET_BIT(infoSettings.general_settings, INDEX_EMULATED_M109_M190) == 0)  // if emulated M109 / M190 is disabled
               break;
 
-            cmd_ptr[cmd_base_index + 2] = '4';  // avoid to send M190 to Marlin
-            setNoWaitHeating(BED);
+            cmd_ptr[cmd_base_index + 2] = '4';  // avoid to send M190 to Marlin, send M140
+            setWaitHeating(BED);
           }
         // no break here. The data processing of M190 is the same as that of M140 below
         case 140:  // M140
           if (fromTFT)
           {
-            synchNoWaitHeating(BED);
+            syncTargetTemp(BED);
           }
           break;
 
         case 191:  // M191
           if (fromTFT)
           {
-            cmd_ptr[cmd_base_index + 2] = '4';  // avoid to send M191 to Marlin
-            setNoWaitHeating(CHAMBER);
+            cmd_ptr[cmd_base_index + 2] = '4';  // avoid to send M191 to Marlin, send M141
+            setWaitHeating(CHAMBER);
           }
         // no break here. The data processing of M191 is the same as that of M141 below
         case 141:  // M141
           if (fromTFT)
           {
-            synchNoWaitHeating(CHAMBER);
+            syncTargetTemp(CHAMBER);
           }
           break;
 
@@ -962,7 +988,7 @@ void sendQueueCmd(void)
         case 201:  // M201 max acceleration (units/s2)
         case 203:  // M203 max feedrate (units/s)
         {
-          uint8_t param = P_STEPS_PER_MM;
+          PARAMETER_NAME param = P_STEPS_PER_MM;
 
           if (cmd_value() == 201) param = P_MAX_ACCELERATION;  // P_MAX_ACCELERATION
           if (cmd_value() == 203) param = P_MAX_FEED_RATE;     // P_MAX_FEED_RATE
@@ -995,7 +1021,7 @@ void sendQueueCmd(void)
         case 218:  // M218 hotend offset
         case 851:  // M851 probe offset
         {
-          uint8_t param = P_HOME_OFFSET;
+          PARAMETER_NAME param = P_HOME_OFFSET;
 
           if (cmd_value() == 218) param = P_HOTEND_OFFSET;  // P_HOTEND_OFFSET
           if (cmd_value() == 851) param = P_PROBE_OFFSET;   // P_PROBE_OFFSET
@@ -1009,7 +1035,7 @@ void sendQueueCmd(void)
         case 207:  // M207 FW retraction
         case 208:  // M208 FW recover
         {
-          uint8_t param = P_FWRETRACT;
+          PARAMETER_NAME param = P_FWRETRACT;
 
           if (cmd_value() == 208) param = P_FWRECOVER;  // P_FWRECOVER
 
@@ -1064,6 +1090,24 @@ void sendQueueCmd(void)
             break;
         #endif
 
+        case 301:  // Hotend PID
+        case 304:  // Bed PID
+        {
+          PARAMETER_NAME param = P_HOTEND_PID;
+
+          if (cmd_value() == 304) param = P_BED_PID;  // P_BED_PID
+
+          if (cmd_seen('P')) setParameter(param, 0, cmd_float());
+          if (cmd_seen('I')) setParameter(param, 1, cmd_float());
+          if (cmd_seen('D')) setParameter(param, 2, cmd_float());
+          break;
+        }
+
+        case 306:  // M306
+          if (getMpcTuningStatus() == REQUESTED && cmd_seen('T'))  // only if requested by GUI
+            setMpcTuningStatus(STARTED);
+          break;
+
         case 355:  // M355
           if (cmd_seen('S'))
             caseLightSetState(cmd_value() > 0);
@@ -1095,13 +1139,23 @@ void sendQueueCmd(void)
         case 569:  // M569 TMC stepping mode
         {
           uint8_t k = (cmd_seen('S')) ? cmd_value() : 0;
-          uint8_t i = (cmd_seen('I')) ? cmd_value() : 0;
+          int8_t i = (cmd_seen('I')) ? cmd_value() : 0;
+
+          // if index is missing or set to -1 (meaning all indexes) then it must be converted to 0
+          // to make sure array index is never negative
+          if (i < 0)
+            i = 0;
 
           if (cmd_seen('X')) setParameter(P_STEALTH_CHOP, STEPPER_INDEX_X + i, k);
           if (cmd_seen('Y')) setParameter(P_STEALTH_CHOP, STEPPER_INDEX_Y + i, k);
           if (cmd_seen('Z')) setParameter(P_STEALTH_CHOP, STEPPER_INDEX_Z + i, k);
 
           i = (cmd_seen('T')) ? cmd_value() : 0;
+
+          // if index is missing or set to -1 (meaning all indexes) then it must be converted to 0
+          // to make sure array index is never negative
+          if (i < 0)
+            i = 0;
 
           if (cmd_seen('E')) setParameter(P_STEALTH_CHOP, STEPPER_INDEX_E0 + i, k);
           break;
@@ -1127,7 +1181,7 @@ void sendQueueCmd(void)
         case 665:  // Delta configuration / Delta tower angle
         case 666:  // Delta endstop adjustments
         {
-          uint8_t param = P_DELTA_TOWER_ANGLE;
+          PARAMETER_NAME param = P_DELTA_TOWER_ANGLE;
 
           if (cmd_value() == 666) param = P_DELTA_ENDSTOP;  // P_DELTA_ENDSTOP
 
@@ -1166,12 +1220,25 @@ void sendQueueCmd(void)
         case 913:  // M913 TMC hybrid threshold speed
         case 914:  // M914 TMC bump sensitivity
         {
-          uint8_t param = P_CURRENT;
+          PARAMETER_NAME param = P_CURRENT;
 
           if (cmd_value() == 913) param = P_HYBRID_THRESHOLD;  // P_HYBRID_THRESHOLD
           if (cmd_value() == 914) param = P_BUMPSENSITIVITY;   // P_BUMPSENSITIVITY
 
-          uint8_t i = (cmd_seen('I')) ? cmd_value() : 0;
+          int8_t i = (cmd_seen('I')) ? cmd_value() : 0;
+
+          // if index is missing or set to -1 (meaning all indexes) then it must be converted to 0
+          // to make sure array index is never negative
+          if (i < 0)
+            i = 0;
+
+          // for M913 and M914, provided index is:
+          //   1->"X1", 2->"X2", 1->"Y1", 2->"Y2", 1->"Z1", 2->"Z2", 3->"Z3", 4->"Z4"
+          // and it must be converted to:
+          //   0->"X1", 1->"X2", 0->"Y1", 1->"Y2", 0->"Z1", 1->"Z2", 2->"Z3", 3->"Z4"
+          // to make sure array index is properly accessed
+          if (param > P_CURRENT && i > 0)
+            i--;
 
           if (cmd_seen('X')) setParameter(param, STEPPER_INDEX_X + i, cmd_value());
           if (cmd_seen('Y')) setParameter(param, STEPPER_INDEX_Y + i, cmd_value());
@@ -1180,6 +1247,11 @@ void sendQueueCmd(void)
           if (param < P_BUMPSENSITIVITY)  // T and E options not supported by M914
           {
             i = (cmd_seen('T')) ? cmd_value() : 0;
+
+            // if index is missing or set to -1 (meaning all indexes) then it must be converted to 0
+            // to make sure array index is never negative
+            if (i < 0)
+              i = 0;
 
             if (cmd_seen('E')) setParameter(param, STEPPER_INDEX_E0 + i, cmd_value());
           }
@@ -1244,12 +1316,18 @@ void sendQueueCmd(void)
           break;
         #endif
 
-        case 90:  // G90
+        case 90:  // G90, set absolute position mode, in Marlin this includes the extruder position unless overridden by M83
           coorSetRelative(false);
+
+          if (infoMachineSettings.firmwareType == FW_MARLIN)
+            eSetRelative(false);
           break;
 
-        case 91:  // G91
+        case 91:  // G91, set relative position mode, in Marlin this includes the extruder position unless overridden by M82
           coorSetRelative(true);
+
+          if (infoMachineSettings.firmwareType == FW_MARLIN)
+            eSetRelative(true);
           break;
 
         case 92:  // G92
