@@ -4,7 +4,7 @@
 static float z_offset_value = HOME_Z_OFFSET_DEFAULT_VALUE;
 static bool home_offset_enabled = false;
 
-// Enable home offset
+// enable home offset
 void homeOffsetEnable(float shim)
 {
   home_offset_enabled = true;
@@ -17,7 +17,7 @@ void homeOffsetEnable(float shim)
   probeHeightRelative();          // set relative position mode
 }
 
-// Disable home offset
+// disable home offset
 void homeOffsetDisable(void)
 {
   home_offset_enabled = false;
@@ -29,13 +29,13 @@ void homeOffsetDisable(void)
   probeHeightDisable();  // restore original software endstops state and ABL state
 }
 
-// Get home offset status
+// get home offset status
 bool homeOffsetGetStatus(void)
 {
   return home_offset_enabled;
 }
 
-// Set Z offset value
+// set Z offset value
 float homeOffsetSetValue(float value)
 {
   sendParameterCmd(P_HOME_OFFSET, AXIS_INDEX_Z, value);
@@ -45,7 +45,7 @@ float homeOffsetSetValue(float value)
   return z_offset_value;
 }
 
-// Get current Z offset value
+// get current Z offset value
 float homeOffsetGetValue(void)
 {
   z_offset_value = getParameter(P_HOME_OFFSET, AXIS_INDEX_Z);
@@ -53,45 +53,32 @@ float homeOffsetGetValue(void)
   return z_offset_value;
 }
 
-// Reset Z offset value to default value
+// reset Z offset value to default value
 float homeOffsetResetValue(void)
 {
-  if (z_offset_value == HOME_Z_OFFSET_DEFAULT_VALUE)  // if already default value, nothing to do
-    return z_offset_value;
+  if (z_offset_value != HOME_Z_OFFSET_DEFAULT_VALUE)  // if not default value
+  {
+    sendParameterCmd(P_HOME_OFFSET, AXIS_INDEX_Z, HOME_Z_OFFSET_DEFAULT_VALUE);  // set Z home offset value
+    mustStoreCmd("G1 Z%.2f\n", z_offset_value - HOME_Z_OFFSET_DEFAULT_VALUE);    // move nozzle
 
-  float unit = z_offset_value - HOME_Z_OFFSET_DEFAULT_VALUE;
-
-  z_offset_value = HOME_Z_OFFSET_DEFAULT_VALUE;
-  sendParameterCmd(P_HOME_OFFSET, AXIS_INDEX_Z, z_offset_value);  // set Z offset value
-  mustStoreCmd("G1 Z%.2f\n", unit);                               // move nozzle
+    z_offset_value = HOME_Z_OFFSET_DEFAULT_VALUE;
+  }
 
   return z_offset_value;
 }
 
-// Update Z offset value
-float homeOffsetUpdateValue(float unit, int8_t direction)
+// update Z offset value
+float homeOffsetUpdateValue(float unit)
 {
-  float diff;
+  unit = z_offset_value - NOBEYOND(HOME_Z_OFFSET_MIN_VALUE, z_offset_value - unit, HOME_Z_OFFSET_MAX_VALUE);
 
-  if (direction < 0)
+  if (unit != 0)
   {
-    if (z_offset_value <= HOME_Z_OFFSET_MIN_VALUE)
-      return z_offset_value;
+    z_offset_value -= unit;
 
-    diff = z_offset_value - HOME_Z_OFFSET_MIN_VALUE;
+    sendParameterCmd(P_HOME_OFFSET, AXIS_INDEX_Z, z_offset_value);  // set Z home offset value
+    mustStoreCmd("G1 Z%.2f\n", unit);                               // move nozzle
   }
-  else
-  {
-    if (z_offset_value >= HOME_Z_OFFSET_MAX_VALUE)
-      return z_offset_value;
-
-    diff = HOME_Z_OFFSET_MAX_VALUE - z_offset_value;
-  }
-
-  unit = ((diff > unit) ? unit : diff) * direction;
-  z_offset_value -= unit;
-  sendParameterCmd(P_HOME_OFFSET, AXIS_INDEX_Z, z_offset_value);  // set Z offset value
-  mustStoreCmd("G1 Z%.2f\n", unit);                               // move nozzle
 
   return z_offset_value;
 }

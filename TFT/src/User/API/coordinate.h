@@ -26,7 +26,7 @@ typedef struct
 typedef struct
 {
   float coordinate;
-  uint16_t feedrate;
+  uint32_t feedrate;
   bool relative;
   bool handled;
 } E_AXIS_BACKUP;
@@ -44,16 +44,17 @@ float coordinateGetAxisTarget(AXIS axis);
 void coordinateSetAxisTarget(AXIS axis, float position);
 uint32_t coordinateGetFeedRate(void);
 void coordinateSetFeedRate(uint32_t feedrate);
-void coordinateGetAll(COORDINATE *tmp);
+void coordinateGetAll(COORDINATE * tmp);
 float coordinateGetExtruderActual(void);
 void coordinateSetExtruderActualSteps(float steps);
 float coordinateGetAxisActual(AXIS axis);
 void coordinateSetAxisActual(AXIS axis, float position);
-void coordinateGetAllActual(COORDINATE *tmp);
-void coordinateQuerySetWait(bool wait);
-void coordinateQuery(uint8_t delay);
-void coordinateQueryTurnOff(void);
+void coordinateGetAllActual(COORDINATE * tmp);
 float coordinateGetAxis(AXIS axis);
+
+void coordinateQueryClearSendingWaiting(void);  // called in sendQueueCmd(). Clear sending waiting for coordinate query
+void coordinateQuery(uint8_t delay);            // query for coordinate
+void coordinateQueryTurnOff(void);
 
 #ifdef __cplusplus
 }

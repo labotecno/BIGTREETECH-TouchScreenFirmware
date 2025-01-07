@@ -1,11 +1,7 @@
 #include "ParameterSettings.h"
 #include "includes.h"
 
-static uint16_t psCurPage = 0;
-static uint8_t curParameter = 0;
-bool parametersChanged = false;
-
-const LABEL parameterTypes[PARAMETERS_COUNT] = {
+static const LABEL parameterTypes[PARAMETERS_COUNT] = {
   LABEL_STEPS_SETTING,
   LABEL_FILAMENT_SETTING,
   LABEL_MAXACCELERATION,
@@ -22,6 +18,7 @@ const LABEL parameterTypes[PARAMETERS_COUNT] = {
   LABEL_BED_PID,
   LABEL_ABL,
   LABEL_STEALTH_CHOP,
+  LABEL_INPUT_SHAPING,
   LABEL_DELTA_CONFIGURATION,
   LABEL_DELTA_TOWER_ANGLE,
   LABEL_DELTA_DIAGONAL_ROD,
@@ -34,15 +31,19 @@ const LABEL parameterTypes[PARAMETERS_COUNT] = {
   LABEL_MBL_OFFSET,
 };
 
-const LISTITEM eepromItems[P_SETTINGS_COUNT] = {
-// icon            ItemType    Item Title              item value text(only for custom value)
+static const LISTITEM eepromItems[P_SETTINGS_COUNT] = {
+// icon            item type   item title              item value text(only for custom value)
   {CHARICON_SAVE,  LIST_LABEL, LABEL_SETTINGS_SAVE,    LABEL_NULL},
   {CHARICON_UNDO,  LIST_LABEL, LABEL_SETTINGS_RESTORE, LABEL_NULL},
   {CHARICON_RESET, LIST_LABEL, LABEL_SETTINGS_RESET,   LABEL_NULL},
 };
 
-// Load elements for selected parameter
-void loadElements(LISTITEM * parameterMainItem, uint16_t index, uint8_t itemPos)
+static uint16_t psCurPage = 0;
+static uint8_t curParameter = 0;
+static bool parametersChanged = false;
+
+// load elements for selected parameter
+static void loadElements(LISTITEM * parameterMainItem, uint16_t index, uint8_t itemPos)
 {
   uint8_t enabledElementCount = getEnabledElementCount(curParameter);
 
@@ -104,6 +105,10 @@ void loadElements(LISTITEM * parameterMainItem, uint16_t index, uint8_t itemPos)
           parameterMainItem->titlelabel.address = stealthChopDisplayID[elementIndex];
           break;
 
+        case P_INPUT_SHAPING:
+          parameterMainItem->titlelabel.address = inputShapingDisplayID[elementIndex];
+          break;
+
         case P_DELTA_CONFIGURATION:
           parameterMainItem->titlelabel.address = deltaConfigurationDisplayID[elementIndex];
           break;
@@ -149,13 +154,14 @@ void loadElements(LISTITEM * parameterMainItem, uint16_t index, uint8_t itemPos)
   }
 }
 
-// Show menu for selected parameter type
-void menuShowParameter(void)
+// show menu for selected parameter type
+static void menuShowParameter(void)
 {
   uint8_t enabledElementCount = getEnabledElementCount(curParameter);
   float oldval[enabledElementCount];
   uint16_t curIndex = KEY_IDLE;
-  PARAMETERS now = infoParameters;
+
+  infoParametersRefreshBackup();
 
   for (uint8_t i = 0; i < enabledElementCount; i++)
   {
@@ -171,10 +177,9 @@ void menuShowParameter(void)
     switch (curIndex)
     {
       case KEY_BACK:
-        if (memcmp(&now, &infoParameters, sizeof(PARAMETERS)))
-        {
+        if (infoParametersHasChange())
           parametersChanged = true;
-        }
+
         CLOSE_MENU();
         break;
 
@@ -185,7 +190,7 @@ void menuShowParameter(void)
         if (elementIndex < getElementCount(curParameter))
         {
           VAL_TYPE val_type = getParameterValType(curParameter, elementIndex);
-          bool negative_val = val_type % 2;  // accept negative values only for val_types with negetive
+          bool negative_val = GET_BIT(val_type, 0);  // accept negative values only for val_types with negative
           float val = getParameter(curParameter, elementIndex);
 
           if (val_type == VAL_TYPE_FLOAT || val_type == VAL_TYPE_NEG_FLOAT)
@@ -209,6 +214,7 @@ void menuShowParameter(void)
       if (oldval[i] != newVal)
       {
         oldval[i] = newVal;
+
         listViewRefreshItem(i);
       }
     }
@@ -217,8 +223,8 @@ void menuShowParameter(void)
   }
 }
 
-// Load main parameter list page
-void loadParameters(LISTITEM * parameterMainItem, uint16_t index, uint8_t itemPos)
+// load main parameter list page
+static void loadParameters(LISTITEM * parameterMainItem, uint16_t index, uint8_t itemPos)
 {
   uint8_t enabledParameterCount = getEnabledParameterCount();
   uint8_t totalItems = (infoMachineSettings.EEPROM == 1) ? (enabledParameterCount + P_SETTINGS_COUNT) : enabledParameterCount;
@@ -247,7 +253,7 @@ void loadParameters(LISTITEM * parameterMainItem, uint16_t index, uint8_t itemPo
   }
 }
 
-// Main parameter menu
+// main parameter menu
 void menuParameterSettings(void)
 {
   uint8_t enabledParameterCount = getEnabledParameterCount();
@@ -266,8 +272,9 @@ void menuParameterSettings(void)
       case KEY_BACK:
         if (parametersChanged && infoMachineSettings.EEPROM == 1)
         {
-          popupDialog(DIALOG_TYPE_QUESTION, title.index, LABEL_EEPROM_SAVE_INFO, LABEL_CONFIRM, LABEL_CANCEL, saveEepromSettings, NULL, NULL);
           parametersChanged = false;
+
+          popupDialog(DIALOG_TYPE_QUESTION, title.index, LABEL_EEPROM_SAVE_INFO, LABEL_CONFIRM, LABEL_CANCEL, saveEepromSettings, NULL, NULL);
         }
         else
         {
@@ -282,34 +289,35 @@ void menuParameterSettings(void)
         if (curIndex < enabledParameterCount)
         {
           curParameter = getEnabledParameter(curIndex);
+
           if (curParameter < PARAMETERS_COUNT)
           {
             mustStoreCmd("M503 S0\n");
+
             OPEN_MENU(menuShowParameter);
           }
-          break;
         }
         // perform EEPROM task
         else if (infoMachineSettings.EEPROM == 1 && curIndex < totalItems)
         {
           uint8_t curIndex_e = (curIndex - enabledParameterCount);
+
           if (curIndex_e == P_SAVE_SETTINGS)
           {
-            popupDialog(DIALOG_TYPE_ALERT, title.index, LABEL_EEPROM_SAVE_INFO, LABEL_CONFIRM, LABEL_CANCEL, saveEepromSettings, NULL, NULL);
             parametersChanged = false;
-            break;
+
+            popupDialog(DIALOG_TYPE_ALERT, title.index, LABEL_EEPROM_SAVE_INFO, LABEL_CONFIRM, LABEL_CANCEL, saveEepromSettings, NULL, NULL);
           }
           else if (curIndex_e == P_RESET_SETTINGS)
           {
             popupDialog(DIALOG_TYPE_ALERT, LABEL_SETTINGS_RESET, LABEL_SETTINGS_RESET_INFO, LABEL_CONFIRM, LABEL_CANCEL, resetEepromSettings, NULL, NULL);
-            break;
           }
           else if (curIndex_e == P_RESTORE_SETTINGS)
           {
             popupDialog(DIALOG_TYPE_ALERT, LABEL_SETTINGS_RESTORE, LABEL_EEPROM_RESTORE_INFO, LABEL_CONFIRM, LABEL_CANCEL, restoreEepromSettings, NULL, NULL);
-            break;
           }
         }
+        break;
     }
 
     loopProcess();

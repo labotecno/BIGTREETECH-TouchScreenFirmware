@@ -1,29 +1,12 @@
 #include "FeatureSettings.h"
 #include "includes.h"
 
-static uint16_t fe_cur_page = 0;
-
-// parameter values
-
-#define ITEM_TOGGLE_AUTO_NUM 3
-const LABEL itemToggleAuto[ITEM_TOGGLE_AUTO_NUM] =
-{
-  LABEL_OFF,
-  LABEL_ON,
-  LABEL_AUTO
-};
-
-#define ITEM_TOGGLE_SMART_NUM 2
-const LABEL itemToggleSmart[ITEM_TOGGLE_SMART_NUM] =
-{
-  LABEL_ON,
-  LABEL_SMART
-};
-
 // add key number index of the items
 typedef enum
 {
-  SKEY_EMULATED_M600 = 0,
+  SKEY_ADVANCED_OK = 0,
+  SKEY_COMMAND_CHECKSUM,
+  SKEY_EMULATED_M600,
   SKEY_EMULATED_M109_M190,
   SKEY_EVENT_LED,
   SKEY_FILE_COMMENT_PARSING,
@@ -47,24 +30,55 @@ typedef enum
   SKEY_START_GCODE_ENABLED,
   SKEY_END_GCODE_ENABLED,
   SKEY_CANCEL_GCODE_ENABLED,
-  SKEY_RESET_SETTINGS,        // Keep reset always at the bottom of the settings menu list.
+  SKEY_RESET_SETTINGS,        // keep reset always at the bottom of the settings menu list
   SKEY_COUNT                  // keep this always at the end
 } SKEY_LIST;
 
+// parameter values
+
+#ifdef FIL_RUNOUT_PIN
+  #define ITEM_TOGGLE_AUTO_NUM 3
+  static const LABEL itemToggleAuto[ITEM_TOGGLE_AUTO_NUM] = {
+    LABEL_OFF,
+    LABEL_ON,
+    LABEL_AUTO
+  };
+#endif
+
+#ifdef PS_ON_PIN
+  #define ITEM_TOGGLE_SMART_NUM 2
+  static const LABEL itemToggleSmart[ITEM_TOGGLE_SMART_NUM] = {
+    LABEL_ON,
+    LABEL_SMART
+  };
+#endif
+
+static uint16_t fe_cur_page = 0;
+
+static void resetSettings(void)
+{
+  initSettings();
+  storePara();
+
+  popupReminder(DIALOG_TYPE_SUCCESS, LABEL_INFO, LABEL_SETTINGS_RESET_DONE);
+}
+
 // perform action on button press
-void updateFeatureSettings(uint8_t item_index)
+static inline void updateFeatureSettings(uint8_t item_index)
 {
   switch (item_index)
   {
+    case SKEY_ADVANCED_OK:
+    case SKEY_COMMAND_CHECKSUM:
     case SKEY_EMULATED_M600:
     case SKEY_EMULATED_M109_M190:
     case SKEY_EVENT_LED:
     case SKEY_FILE_COMMENT_PARSING:
-      TOGGLE_BIT(infoSettings.general_settings, ((item_index - SKEY_EMULATED_M600) + INDEX_EMULATED_M600));
+      TOGGLE_BIT(infoSettings.general_settings, ((item_index - SKEY_ADVANCED_OK) + INDEX_ADVANCED_OK));
       break;
 
     case SKEY_SERIAL_ALWAYS_ON:
-      infoSettings.serial_always_on = (infoSettings.serial_always_on + 1) % ITEM_TOGGLE_NUM;
+      TOGGLE_BIT(infoSettings.serial_always_on, 0);
       break;
 
     case SKEY_SPEED:
@@ -72,15 +86,15 @@ void updateFeatureSettings(uint8_t item_index)
       break;
 
     case SKEY_AUTO_LOAD_LEVELING:
-      infoSettings.auto_load_leveling = (infoSettings.auto_load_leveling + 1) % ITEM_TOGGLE_NUM;
+      TOGGLE_BIT(infoSettings.auto_load_leveling, 0);
       break;
 
     case SKEY_PROBING_Z_OFFSET:
-      infoSettings.probing_z_offset = (infoSettings.probing_z_offset + 1) % ITEM_TOGGLE_NUM;
+      TOGGLE_BIT(infoSettings.probing_z_offset, 0);
       break;
 
     case SKEY_Z_STEPPERS_ALIGNMENT:
-      infoSettings.z_steppers_alignment = (infoSettings.z_steppers_alignment + 1) % ITEM_TOGGLE_NUM;
+      TOGGLE_BIT(infoSettings.z_steppers_alignment, 0);
       break;
 
     #ifdef PS_ON_PIN
@@ -91,20 +105,20 @@ void updateFeatureSettings(uint8_t item_index)
 
     #ifdef FIL_RUNOUT_PIN
       case SKEY_FIL_RUNOUT:
-        infoSettings.runout ^= (1U << 0);
+        TOGGLE_BIT(infoSettings.runout, 0);
         break;
     #endif
 
     case SKEY_PL_RECOVERY:
-      infoSettings.plr = (infoSettings.plr + 1) % ITEM_TOGGLE_NUM;
+      TOGGLE_BIT(infoSettings.plr, 0);
       break;
 
     case SKEY_PL_RECOVERY_HOME:
-      infoSettings.plr_home = (infoSettings.plr_home + 1) % ITEM_TOGGLE_NUM;
+      TOGGLE_BIT(infoSettings.plr_home, 0);
       break;
 
     case SKEY_BTT_MINI_UPS:
-      infoSettings.btt_ups = (infoSettings.btt_ups + 1) % ITEM_TOGGLE_NUM;
+      TOGGLE_BIT(infoSettings.btt_ups, 0);
       break;
 
     case SKEY_START_GCODE_ENABLED:
@@ -120,20 +134,22 @@ void updateFeatureSettings(uint8_t item_index)
     default:
       return;
   }
-}  // updateFeatureSettings
+} // updateFeatureSettings
 
 // load values on page change and reload
-void loadFeatureSettings(LISTITEM * item, uint16_t item_index, uint8_t itemPos)
+static void loadFeatureSettings(LISTITEM * item, uint16_t item_index, uint8_t itemPos)
 {
   if (item_index < SKEY_COUNT)
   {
     switch (item_index)
     {
+      case SKEY_ADVANCED_OK:
+      case SKEY_COMMAND_CHECKSUM:
       case SKEY_EMULATED_M600:
       case SKEY_EMULATED_M109_M190:
       case SKEY_EVENT_LED:
       case SKEY_FILE_COMMENT_PARSING:
-        item->icon = iconToggle[GET_BIT(infoSettings.general_settings, ((item_index - SKEY_EMULATED_M600) + INDEX_EMULATED_M600))];
+        item->icon = iconToggle[GET_BIT(infoSettings.general_settings, ((item_index - SKEY_ADVANCED_OK) + INDEX_ADVANCED_OK))];
         break;
 
       case SKEY_SERIAL_ALWAYS_ON:
@@ -166,7 +182,8 @@ void loadFeatureSettings(LISTITEM * item, uint16_t item_index, uint8_t itemPos)
         case SKEY_FIL_RUNOUT:
         {
           LABEL sensorLabel = itemToggleSmart[GET_BIT(infoSettings.runout, 1)];
-          item->valueLabel.index = (GET_BIT(infoSettings.runout, 0)) ? sensorLabel.index : LABEL_OFF ;
+
+          item->valueLabel.index = (GET_BIT(infoSettings.runout, 0)) ? sensorLabel.index : LABEL_OFF;
           break;
         }
       #endif
@@ -196,14 +213,7 @@ void loadFeatureSettings(LISTITEM * item, uint16_t item_index, uint8_t itemPos)
         break;
     }
   }
-}  // loadFeatureSettings
-
-void resetSettings(void)
-{
-  initSettings();
-  storePara();
-  popupReminder(DIALOG_TYPE_SUCCESS, LABEL_INFO, LABEL_SETTINGS_RESET_DONE);
-}
+} // loadFeatureSettings
 
 void menuFeatureSettings(void)
 {
@@ -211,6 +221,8 @@ void menuFeatureSettings(void)
 
   // set item types
   LISTITEM settingPage[SKEY_COUNT] = {
+    {CHARICON_TOGGLE_ON,   LIST_TOGGLE,        LABEL_ADVANCED_OK,            LABEL_NULL},
+    {CHARICON_TOGGLE_ON,   LIST_TOGGLE,        LABEL_COMMAND_CHECKSUM,       LABEL_NULL},
     {CHARICON_TOGGLE_ON,   LIST_TOGGLE,        LABEL_EMULATED_M600,          LABEL_NULL},
     {CHARICON_TOGGLE_ON,   LIST_TOGGLE,        LABEL_EMULATED_M109_M190,     LABEL_NULL},
     {CHARICON_TOGGLE_ON,   LIST_TOGGLE,        LABEL_EVENT_LED,              LABEL_NULL},
@@ -235,13 +247,11 @@ void menuFeatureSettings(void)
     {CHARICON_TOGGLE_ON,   LIST_TOGGLE,        LABEL_START_GCODE_ENABLED,    LABEL_NULL},
     {CHARICON_TOGGLE_ON,   LIST_TOGGLE,        LABEL_END_GCODE_ENABLED,      LABEL_NULL},
     {CHARICON_TOGGLE_ON,   LIST_TOGGLE,        LABEL_CANCEL_GCODE_ENABLED,   LABEL_NULL},
-    // Keep reset settings always at the bottom of the settings menu list.
+    // keep reset settings always at the bottom of the settings menu list
     {CHARICON_BLANK,       LIST_MOREBUTTON,    LABEL_SETTINGS_RESET,         LABEL_NULL}
   };
 
   uint16_t index = KEY_IDLE;
-
-  backupCurrentSettings();  // backup current Settings data if not already backed up
 
   listViewCreate(title, settingPage, SKEY_COUNT, &fe_cur_page, true, NULL, loadFeatureSettings);
 
@@ -258,5 +268,5 @@ void menuFeatureSettings(void)
     loopProcess();
   }
 
-  storeCurrentSettings();  // store new Settings data to FLASH, if changed, and release backed up Settings data
+  saveSettings();  // save settings
 }

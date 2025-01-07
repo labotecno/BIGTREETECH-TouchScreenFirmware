@@ -1,10 +1,9 @@
 #include "NotificationMenu.h"
 #include "includes.h"
 
-void loadNotificationItems(void)
+static void loadNotificationItems(void)
 {
   LISTITEMS * itemlist = getCurListItems();
-  uint8_t n = 0;
 
   for (uint8_t i = 0; i < MAX_MSG_COUNT; i++)
   {
@@ -28,7 +27,6 @@ void loadNotificationItems(void)
       }
 
       itemlist->items[i].titlelabel.address = tempNotify->text;
-      n++;
     }
     else
     {
@@ -37,14 +35,13 @@ void loadNotificationItems(void)
 
     menuDrawListItem(&itemlist->items[i], i);
   }
-  //return n;
 }
 
 void menuNotification(void)
 {
   LISTITEMS notificationItems = {
     LABEL_NOTIFICATIONS,
-    // icon            ItemType    Item Title     item value text(only for custom value)
+    // icon            item type   item title     item value text(only for custom value)
     {
       {CHARICON_NULL,  LIST_LABEL, LABEL_DYNAMIC, LABEL_NULL},
       {CHARICON_NULL,  LIST_LABEL, LABEL_DYNAMIC, LABEL_NULL},
@@ -52,7 +49,11 @@ void menuNotification(void)
       {CHARICON_NULL,  LIST_LABEL, LABEL_DYNAMIC, LABEL_NULL},
       {CHARICON_NULL,  LIST_LABEL, LABEL_DYNAMIC, LABEL_NULL},
       {CHARICON_BLANK, LIST_LABEL, LABEL_CLEAR,   LABEL_NULL},
-      {CHARICON_NULL,  LIST_LABEL, LABEL_NULL,    LABEL_NULL},
+      #ifdef DEBUG_MONITORING
+        {CHARICON_BLANK, LIST_LABEL, LABEL_INFO,    LABEL_NULL},
+      #else
+        {CHARICON_NULL,  LIST_LABEL, LABEL_NULL,    LABEL_NULL},
+      #endif
       {CHARICON_BACK,  LIST_LABEL, LABEL_NULL,    LABEL_NULL},
     }
   };
@@ -61,16 +62,20 @@ void menuNotification(void)
 
   menuDrawListPage(&notificationItems);
   loadNotificationItems();
+
   setNotificationHandler(loadNotificationItems);
 
   while (MENU_IS(menuNotification))
   {
     key_num = menuKeyGetValue();
+
     switch (key_num)
     {
       case KEY_ICON_0:
       case KEY_ICON_1:
       case KEY_ICON_2:
+      case KEY_ICON_3:
+      case KEY_ICON_4:
         replayNotification(key_num);
         break;
 
@@ -78,6 +83,12 @@ void menuNotification(void)
         clearNotification();
         loadNotificationItems();
         break;
+
+      #ifdef DEBUG_MONITORING
+        case KEY_ICON_6:
+          OPEN_MENU(menuMonitoring);
+          break;
+      #endif
 
       case KEY_ICON_7:
         CLOSE_MENU();

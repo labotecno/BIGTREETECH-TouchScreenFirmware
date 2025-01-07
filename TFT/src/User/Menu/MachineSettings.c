@@ -17,25 +17,18 @@ void menuCustom(void)
   {
     customItems[i].icon = CHARICON_CODE;
     customItems[i].itemType = LIST_LABEL;
-    customItems[i].titlelabel.address = (uint8_t*)customcodes.name[i];
+    customItems[i].titlelabel.address = (uint8_t *)customcodes.name[i];
   }
 
   listViewCreate(title, customItems, customcodes.count, NULL, true, NULL, NULL);
 
-  while (MENU_IS(menuCustom))
-  {
-    curIndex = listViewGetSelectedIndex();
-
-    if (curIndex < customcodes.count)
-      mustStoreScript(customcodes.gcode[curIndex]);
-
-    loopProcess();
-  }
+  TASK_LOOP_WHILE(MENU_IS(menuCustom), curIndex = listViewGetSelectedIndex();
+                  if (curIndex < customcodes.count) mustStoreScript(customcodes.gcode[curIndex]));
 }
 
 #ifdef QUICK_EEPROM_BUTTON
 
-void menuEepromSettings(void)
+static void menuEepromSettings(void)
 {
   MENUITEMS eepromSettingsItems = {
     // title
@@ -60,6 +53,7 @@ void menuEepromSettings(void)
   while (MENU_IS(menuEepromSettings))
   {
     curIndex = menuKeyGetValue();
+
     switch (curIndex)
     {
       case KEY_ICON_0:
@@ -122,21 +116,24 @@ void menuMachineSettings(void)
 
   if (infoMachineSettings.firmwareType == FW_REPRAPFW)
   {
-    ITEM no_custom = { ICON_NULL, LABEL_NULL };
-    machineSettingsItems.items[2] = no_custom;
+    machineSettingsItems.items[2].icon = ICON_NULL;
+    machineSettingsItems.items[2].label.index = LABEL_NULL;
   }
 
   KEY_VALUES curIndex = KEY_IDLE;
-  const ITEM itemCaseLight = {ICON_CASE_LIGHT, LABEL_CASE_LIGHT};
 
   if (infoMachineSettings.caseLightsBrightness == ENABLED)
-    machineSettingsItems.items[KEY_ICON_6] = itemCaseLight;
+  {
+    machineSettingsItems.items[KEY_ICON_6].icon = ICON_CASE_LIGHT;
+    machineSettingsItems.items[KEY_ICON_6].label.index = LABEL_CASE_LIGHT;
+  }
 
   menuDrawPage(&machineSettingsItems);
 
   while (MENU_IS(menuMachineSettings))
   {
     curIndex = menuKeyGetValue();
+
     switch (curIndex)
     {
       case KEY_ICON_0:

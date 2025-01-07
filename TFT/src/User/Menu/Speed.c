@@ -1,13 +1,19 @@
 #include "Speed.h"
 #include "includes.h"
 
-const ITEM itemPercentType[SPEED_NUM] = {
+typedef struct
+{
+  uint8_t cur;
+  uint8_t set;
+} LASTSPEED;
+
+static const ITEM itemPercentType[SPEED_NUM] = {
   // icon                        label
   {ICON_MOVE,                    LABEL_PERCENTAGE_SPEED},
   {ICON_EXTRUDE,                 LABEL_PERCENTAGE_FLOW},
 };
 
-const int16_t itemPercentTypeTitle[SPEED_NUM] = {
+static const int16_t itemPercentTypeTitle[SPEED_NUM] = {
   LABEL_PERCENTAGE_SPEED,
   LABEL_PERCENTAGE_FLOW
 };
@@ -16,10 +22,12 @@ static uint8_t item_index = 0;
 static uint8_t percentSteps_index = 1;
 
 #ifdef TFT70_V3_0
+
 void setSpeedItemIndex(uint8_t index)
 {
   item_index = index;
 }
+
 #endif
 
 void menuSpeed(void)
@@ -87,9 +95,7 @@ void menuSpeed(void)
 
       case KEY_ICON_4:
         if (infoSettings.ext_count > 0)
-        {
           item_index = (item_index + 1) % SPEED_NUM;
-        }
 
         percentageItems.title.index = itemPercentTypeTitle[item_index];
         percentageItems.items[key_num] = itemPercentType[item_index];

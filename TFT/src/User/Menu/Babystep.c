@@ -3,7 +3,7 @@
 
 static uint8_t moveLenSteps_index = 0;
 
-void babyReDraw(float babystep, float z_offset, bool force_z_offset, bool drawHeader)
+static void babyReDraw(float babystep, float z_offset, bool force_z_offset, bool drawHeader)
 {
   if (drawHeader)
   {
@@ -27,7 +27,7 @@ void babyReDraw(float babystep, float z_offset, bool force_z_offset, bool drawHe
 
   setFontSize(FONT_SIZE_LARGE);
   sprintf(tempstr, "% 6.2f", babystep);
-  GUI_DispStringRight(point_bs.x, point_bs.y, (uint8_t*) tempstr);
+  GUI_DispStringRight(point_bs.x, point_bs.y, (uint8_t *) tempstr);
 
   if (infoMachineSettings.firmwareType != FW_REPRAPFW)
   {
@@ -38,23 +38,24 @@ void babyReDraw(float babystep, float z_offset, bool force_z_offset, bool drawHe
     else
       GUI_SetColor(infoSettings.font_color);
 
-    GUI_DispStringRight(point_of.x, point_of.y, (uint8_t*) tempstr);
+    GUI_DispStringRight(point_of.x, point_of.y, (uint8_t *) tempstr);
   }
 
   GUI_SetColor(infoSettings.font_color);  // restore default font color
   setFontSize(FONT_SIZE_NORMAL);
 }
 
-// Set Z offset value for MBL bl type
-float babyMblOffsetSetValue(float value)
+// set Z offset value for MBL bl type
+static float babyMblOffsetSetValue(float value)
 {
   mustStoreCmd("G29 S4 Z%.2f\n", value);
   mustStoreCmd("G29 S0\n");  // needed by babyMblOffsetGetValue() to retrieve the new value
+
   return value;
 }
 
-// Get current Z offset value for MBL bl type
-float babyMblOffsetGetValue(void)
+// get current Z offset value for MBL bl type
+static float babyMblOffsetGetValue(void)
 {
   return getParameter(P_MBL_OFFSET, 0);
 }
@@ -138,20 +139,24 @@ void menuBabystep(void)
       // decrease babystep / Z offset
       case KEY_ICON_0:
       case KEY_DECREASE:
-        babystep = babystepUpdateValue(unit, -1);
+        babystep = babystepUpdateValue(-unit);
         break;
 
       // increase babystep / Z offset
       case KEY_ICON_3:
       case KEY_INCREASE:
-        babystep = babystepUpdateValue(unit, 1);
+        babystep = babystepUpdateValue(unit);
         break;
 
       // save to EEPROM and apply Z offset
       case KEY_ICON_4:
         if (infoMachineSettings.EEPROM == 1)
         {
-          orig_z_offset = offsetSetValue(new_z_offset);  // set new Z offset. Required if current Z offset is not changed applying babystep changes (e.g. no BABYSTEP_ZPROBE_OFFSET is set in Marlin FW)
+          // set new Z offset.
+          // Required if current Z offset is not changed applying babystep changes (e.g. no BABYSTEP_ZPROBE_OFFSET is set in Marlin FW)
+          //
+          orig_z_offset = offsetSetValue(new_z_offset);
+
           popupDialog(DIALOG_TYPE_QUESTION, babyStepItems.title.index, LABEL_EEPROM_SAVE_INFO, LABEL_CONFIRM, LABEL_CANCEL, saveEepromSettings, NULL, NULL);
         }
         break;
@@ -170,10 +175,13 @@ void menuBabystep(void)
 
         if (infoMachineSettings.firmwareType != FW_REPRAPFW)
         {
+          // set new Z offset.
+          // Required if current Z offset is not changed applying babystep changes (e.g. no BABYSTEP_ZPROBE_OFFSET is set in Marlin FW)
+          //
           if (infoMachineSettings.zProbe == ENABLED || infoMachineSettings.leveling == BL_MBL)
-            orig_z_offset = offsetSetValue(new_z_offset - babystep);  // set new Z offset. Required if current Z offset is not changed applying babystep changes (e.g. no BABYSTEP_ZPROBE_OFFSET is set in Marlin FW)
+            orig_z_offset = offsetSetValue(new_z_offset - babystep + orig_babystep);
           else  // if HomeOffset
-            orig_z_offset = offsetSetValue(new_z_offset + babystep);  // set new Z offset. Required if current Z offset is not changed applying babystep changes (e.g. no BABYSTEP_ZPROBE_OFFSET is set in Marlin FW)
+            orig_z_offset = offsetSetValue(new_z_offset + babystep - orig_babystep);
         }
         break;
 
@@ -189,19 +197,20 @@ void menuBabystep(void)
 
     if (now_babystep != babystep || now_z_offset != z_offset)
     {
-      if (now_z_offset != z_offset || (orig_babystep - 0.005f <= babystep && babystep <= orig_babystep + 0.005f))
+      if (now_z_offset != z_offset || WITHIN(babystep, orig_babystep - 0.005f, orig_babystep + 0.005f))
       {
         // if current Z offset is changed applying babystep changes (e.g. BABYSTEP_ZPROBE_OFFSET is set in Marlin FW)
-        // or babystep is almost the same as the initial one,
-        // we don't force Z offset change
+        // or babystep is almost the same as the initial one, we don't force Z offset change
+        //
         new_z_offset = now_z_offset = z_offset;
 
         force_z_offset = false;
       }
-      else if (orig_z_offset - 0.005f <= z_offset && z_offset <= orig_z_offset + 0.005f)
+      else if (WITHIN(z_offset, orig_z_offset - 0.005f, orig_z_offset + 0.005f))
       {
         // if current Z offset is not changed applying babystep changes (e.g. no BABYSTEP_ZPROBE_OFFSET is set in Marlin FW),
         // we force Z offset change
+        //
         if (infoMachineSettings.zProbe == ENABLED || infoMachineSettings.leveling == BL_MBL)
           new_z_offset = z_offset + babystep - orig_babystep;
         else  // if HomeOffset
@@ -211,6 +220,7 @@ void menuBabystep(void)
       }
 
       now_babystep = babystep;
+
       babyReDraw(now_babystep, new_z_offset, force_z_offset, false);
     }
 
@@ -218,5 +228,8 @@ void menuBabystep(void)
   }
 
   if (infoMachineSettings.firmwareType != FW_REPRAPFW)
-    offsetSetValue(new_z_offset);  // set new Z offset. Required if current Z offset is not changed applying babystep changes (e.g. no BABYSTEP_ZPROBE_OFFSET is set in Marlin FW)
+    // set new Z offset.
+    // Required if current Z offset is not changed applying babystep changes (e.g. no BABYSTEP_ZPROBE_OFFSET is set in Marlin FW)
+    //
+    offsetSetValue(new_z_offset);
 }

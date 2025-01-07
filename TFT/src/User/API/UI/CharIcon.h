@@ -8,12 +8,14 @@ extern "C" {
 #include <stdint.h>
 #include "GUI.h"
 
+// this list is Auto-Generated. Please add new icons in CharIcon.inc only
 typedef enum
 {
   #define X_CHAR(NAME) CHARICON_##NAME ,
-  #include "CharIcon.inc"
-  #undef  X_CHAR
-  //keep below items always at the end
+    #include "CharIcon.inc"
+  #undef X_CHAR
+
+  // keep the following always at the end of this list
   CHARICON_NUM,
   CHARICON_NULL
 } CHAR_ICON;
@@ -21,7 +23,6 @@ typedef enum
 extern const uint16_t charIconColor[CHARICON_NUM];
 
 uint8_t * IconCharSelect(uint8_t sel);
-char * IconChar(uint8_t sel);
 void drawCharIcon(const GUI_RECT * rect, ALIGN_POSITION iconalign, uint16_t iconindex, bool drawBgColor, uint16_t btn_color);
 
 #ifdef __cplusplus
